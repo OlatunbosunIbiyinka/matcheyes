@@ -1,0 +1,66 @@
+[project]
+name = "matcheyes"
+version = "0.0.1"
+description = "MatchEyes — See beyond the score. An explainable football intelligence engine on Azure."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [{ name = "Olatunbosun Ibiyinka" }]
+dependencies = []
+
+[project.scripts]
+matcheyes = "matcheyes.__main__:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-cov>=6.0",
+    "ruff>=0.8",
+    "mypy>=1.13",
+]
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/matcheyes"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W",   # pycodestyle
+    "F",        # pyflakes
+    "I",        # isort
+    "B",        # bugbear
+    "UP",       # pyupgrade
+    "SIM",      # simplify
+    "N",        # naming
+    "S",        # bandit (security)
+    "TID",      # tidy imports
+    "RUF",
+]
+
+[tool.ruff.lint.flake8-tidy-imports]
+# Absolute imports keep layer dependencies visible to tests/architecture.
+ban-relative-imports = "all"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+mypy_path = "src"
+packages = ["matcheyes"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers --strict-config"
+markers = [
+    "integration: requires external services (Azure, model endpoints); skipped by default in CI",
+]

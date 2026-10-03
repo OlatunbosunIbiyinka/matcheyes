@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+build/
+dist/
+
+# Tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Local-only data (raw hackathon drops are added deliberately, see data/README.md)
+data/local/
+
+# Node (web app, later stage)
+node_modules/
+
+# Terraform (later stage)
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
