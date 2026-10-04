@@ -28,8 +28,21 @@ On Windows, if `uv` is not on `PATH` after a `--user` install, use `python -m uv
 uv run ruff format .    # format
 uv run ruff check --fix .
 uv run mypy
-uv run pytest
+uv run pytest -m "not slow"   # fast loop (~30 s)
+uv run pytest                 # everything, incl. multi-seed generator statistics (~5 min)
 ./scripts/check.sh      # full gate (Windows: ./scripts/check.ps1)
+```
+
+Tests marked `slow` are the generator's multi-seed realism and effect-size checks. CI always
+runs them.
+
+Analytics evaluation is a separate, manual step. It is not part of the gate, because its numbers
+are results to report, not pass/fail thresholds:
+
+```bash
+uv run python -m matcheyes_eval tune --seeds 20                       # development seeds only
+uv run python -m matcheyes_eval stage2 --split development --seeds 20
+uv run python -m matcheyes_eval stage2 --split held-out --seeds 20    # only with a frozen config
 ```
 
 ## Coding standards

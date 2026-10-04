@@ -1,5 +1,6 @@
-"""FACTS layer: normalized, typed football domain model (matches, teams, players, events).
+"""FACTS layer: the observable football domain model (league entities, team sheets, events).
 
-Defined only after the hackathon data has been inspected (Stage 1).
+This is the complete information MatchEyes may consume. Hidden ground truth lives outside
+this package and can never be imported here (enforced by tests/architecture).
 Must not depend on any other MatchEyes package or on any AI/cloud SDK.
 """

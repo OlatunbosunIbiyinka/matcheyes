@@ -11,5 +11,5 @@ function Invoke-Step($Name, [scriptblock]$Block) {
 Invoke-Step "ruff format --check" { python -m uv run ruff format --check . }
 Invoke-Step "ruff check"          { python -m uv run ruff check . }
 Invoke-Step "mypy"                { python -m uv run mypy }
-Invoke-Step "pytest"              { python -m uv run pytest --cov=matcheyes --cov-report=term-missing }
+Invoke-Step "pytest"              { python -m uv run pytest --cov=matcheyes --cov=matcheyes_synth --cov-report=term-missing }
 Write-Host "All checks passed." -ForegroundColor Green

@@ -1,0 +1,254 @@
+{
+  "match_id": "fixture-minimal-001",
+  "competition": "Meridian League",
+  "season": "2026-27",
+  "matchday": 1,
+  "kickoff": "2026-08-15T15:00:00Z",
+  "venue": "The Lighthouse Ground",
+  "referee": "A. Referee",
+  "home": {
+    "club": {
+      "club_id": "kestrel-bay",
+      "name": "Kestrel Bay FC",
+      "short_name": "KBY",
+      "primary_colour": "#0B3D91",
+      "secondary_colour": "#F2C14E"
+    },
+    "formation": "4-3-3",
+    "starting_xi": [
+      {
+        "player_id": "kestrel-bay-01",
+        "name": "KBY Player 1",
+        "shirt_number": 1,
+        "position": "GK"
+      },
+      {
+        "player_id": "kestrel-bay-02",
+        "name": "KBY Player 2",
+        "shirt_number": 2,
+        "position": "RB"
+      },
+      {
+        "player_id": "kestrel-bay-03",
+        "name": "KBY Player 3",
+        "shirt_number": 3,
+        "position": "CB"
+      },
+      {
+        "player_id": "kestrel-bay-04",
+        "name": "KBY Player 4",
+        "shirt_number": 4,
+        "position": "CB"
+      },
+      {
+        "player_id": "kestrel-bay-05",
+        "name": "KBY Player 5",
+        "shirt_number": 5,
+        "position": "LB"
+      },
+      {
+        "player_id": "kestrel-bay-06",
+        "name": "KBY Player 6",
+        "shirt_number": 6,
+        "position": "DM"
+      },
+      {
+        "player_id": "kestrel-bay-07",
+        "name": "KBY Player 7",
+        "shirt_number": 7,
+        "position": "CM"
+      },
+      {
+        "player_id": "kestrel-bay-08",
+        "name": "KBY Player 8",
+        "shirt_number": 8,
+        "position": "CM"
+      },
+      {
+        "player_id": "kestrel-bay-09",
+        "name": "KBY Player 9",
+        "shirt_number": 9,
+        "position": "RW"
+      },
+      {
+        "player_id": "kestrel-bay-10",
+        "name": "KBY Player 10",
+        "shirt_number": 10,
+        "position": "LW"
+      },
+      {
+        "player_id": "kestrel-bay-11",
+        "name": "KBY Player 11",
+        "shirt_number": 11,
+        "position": "ST"
+      }
+    ],
+    "bench": [
+      {
+        "player_id": "kestrel-bay-12",
+        "name": "KBY Player 12",
+        "shirt_number": 12,
+        "position": "GK"
+      },
+      {
+        "player_id": "kestrel-bay-13",
+        "name": "KBY Player 13",
+        "shirt_number": 13,
+        "position": "CB"
+      },
+      {
+        "player_id": "kestrel-bay-14",
+        "name": "KBY Player 14",
+        "shirt_number": 14,
+        "position": "CM"
+      },
+      {
+        "player_id": "kestrel-bay-15",
+        "name": "KBY Player 15",
+        "shirt_number": 15,
+        "position": "RW"
+      },
+      {
+        "player_id": "kestrel-bay-16",
+        "name": "KBY Player 16",
+        "shirt_number": 16,
+        "position": "ST"
+      },
+      {
+        "player_id": "kestrel-bay-17",
+        "name": "KBY Player 17",
+        "shirt_number": 17,
+        "position": "LB"
+      },
+      {
+        "player_id": "kestrel-bay-18",
+        "name": "KBY Player 18",
+        "shirt_number": 18,
+        "position": "AM"
+      }
+    ]
+  },
+  "away": {
+    "club": {
+      "club_id": "redmarsh",
+      "name": "Redmarsh Town",
+      "short_name": "RMT",
+      "primary_colour": "#B22222",
+      "secondary_colour": "#F5F5F5"
+    },
+    "formation": "4-3-3",
+    "starting_xi": [
+      {
+        "player_id": "redmarsh-01",
+        "name": "RMT Player 1",
+        "shirt_number": 1,
+        "position": "GK"
+      },
+      {
+        "player_id": "redmarsh-02",
+        "name": "RMT Player 2",
+        "shirt_number": 2,
+        "position": "RB"
+      },
+      {
+        "player_id": "redmarsh-03",
+        "name": "RMT Player 3",
+        "shirt_number": 3,
+        "position": "CB"
+      },
+      {
+        "player_id": "redmarsh-04",
+        "name": "RMT Player 4",
+        "shirt_number": 4,
+        "position": "CB"
+      },
+      {
+        "player_id": "redmarsh-05",
+        "name": "RMT Player 5",
+        "shirt_number": 5,
+        "position": "LB"
+      },
+      {
+        "player_id": "redmarsh-06",
+        "name": "RMT Player 6",
+        "shirt_number": 6,
+        "position": "DM"
+      },
+      {
+        "player_id": "redmarsh-07",
+        "name": "RMT Player 7",
+        "shirt_number": 7,
+        "position": "CM"
+      },
+      {
+        "player_id": "redmarsh-08",
+        "name": "RMT Player 8",
+        "shirt_number": 8,
+        "position": "CM"
+      },
+      {
+        "player_id": "redmarsh-09",
+        "name": "RMT Player 9",
+        "shirt_number": 9,
+        "position": "RW"
+      },
+      {
+        "player_id": "redmarsh-10",
+        "name": "RMT Player 10",
+        "shirt_number": 10,
+        "position": "LW"
+      },
+      {
+        "player_id": "redmarsh-11",
+        "name": "RMT Player 11",
+        "shirt_number": 11,
+        "position": "ST"
+      }
+    ],
+    "bench": [
+      {
+        "player_id": "redmarsh-12",
+        "name": "RMT Player 12",
+        "shirt_number": 12,
+        "position": "GK"
+      },
+      {
+        "player_id": "redmarsh-13",
+        "name": "RMT Player 13",
+        "shirt_number": 13,
+        "position": "CB"
+      },
+      {
+        "player_id": "redmarsh-14",
+        "name": "RMT Player 14",
+        "shirt_number": 14,
+        "position": "CM"
+      },
+      {
+        "player_id": "redmarsh-15",
+        "name": "RMT Player 15",
+        "shirt_number": 15,
+        "position": "RW"
+      },
+      {
+        "player_id": "redmarsh-16",
+        "name": "RMT Player 16",
+        "shirt_number": 16,
+        "position": "ST"
+      },
+      {
+        "player_id": "redmarsh-17",
+        "name": "RMT Player 17",
+        "shirt_number": 17,
+        "position": "LB"
+      },
+      {
+        "player_id": "redmarsh-18",
+        "name": "RMT Player 18",
+        "shirt_number": 18,
+        "position": "AM"
+      }
+    ]
+  },
+  "synthetic": true
+}

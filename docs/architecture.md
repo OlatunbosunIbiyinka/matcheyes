@@ -30,6 +30,28 @@ orchestration (and below)  <-  api
 `domain`, `ingestion` and `analytics` must not import any AI or cloud SDK. These rules are
 enforced by `tests/architecture/test_layer_boundaries.py` and run in CI.
 
+## Analytics (Stage 2)
+
+The analytics layer turns observable events into traceable evidence that is capped at
+ASSOCIATED. The steps are possessions and a minute timeline, then per-team metric series, then
+shifts, then evidence objects (FACT or ANALYSIS), then candidate moments. Definitions are in
+[metrics.md](metrics.md), the design is in
+[ADR-0008](decisions/0008-deterministic-analytics-design.md) and the results are in
+[stage2-evaluation.md](stage2-evaluation.md). The entry point is
+`matcheyes.analytics.analysis.analyse_match`. The root CLI (`python -m matcheyes analyse`)
+composes ingestion and analytics.
+
+## Observable world vs hidden world
+
+```
+matcheyes_synth  ──►  matcheyes.domain / ingestion        (generator emits engine-valid data)
+matcheyes_eval   ──►  matcheyes + matcheyes_synth         (only place truth meets output)
+matcheyes        ──►  (neither)                           (engine is blind to ground truth)
+```
+
+Only `matcheyes` ships in the deployable wheel. See
+[synthetic-data.md](synthetic-data.md) and [ADR-0005](decisions/0005-observable-and-hidden-worlds.md).
+
 ## Pipeline (target)
 
 ```
