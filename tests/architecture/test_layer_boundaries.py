@@ -13,7 +13,8 @@ ALLOWED_INTERNAL_DEPENDENCIES: dict[str, set[str]] = {
     "analytics": {"domain"},
     "agents": {"domain", "analytics"},
     "orchestration": {"domain", "ingestion", "analytics", "agents"},
-    "api": {"domain", "ingestion", "analytics", "agents", "orchestration"},
+    "personalization": {"domain", "analytics", "agents", "orchestration"},
+    "api": {"domain", "ingestion", "analytics", "agents", "orchestration", "personalization"},
 }
 
 AI_AND_CLOUD_SDK_PREFIXES = ("agent_framework", "openai", "azure", "anthropic", "langchain")

@@ -4,7 +4,8 @@ deterministic analyses; nothing they receive or can request carries generator st
 
 The engine-wide textual scan for matcheyes_synth / matcheyes_eval is in test_truth_separation;
 these tests add the Stage 4 specifics: what a model is shown, what it can ask for, and which
-modules may touch the network or the environment.
+modules may touch the network or the environment. The Stage 6 personalization layer is held to
+the same import and dynamic-code rules, with no network exception.
 """
 
 import json
@@ -22,7 +23,11 @@ from tests.agents.support import RED_CARD, case_for, strongest, workspace
 from tests.support.imports import imported_modules, python_files
 from tests.synth.generated import generated
 
-REASONING_FILES = python_files("matcheyes/agents") + python_files("matcheyes/orchestration")
+REASONING_FILES = (
+    python_files("matcheyes/agents")
+    + python_files("matcheyes/orchestration")
+    + python_files("matcheyes/personalization")
+)
 NETWORK_MODULES = ("urllib", "http", "socket", "requests", "httpx", "aiohttp", "ssl")
 PROCESS_MODULES = ("subprocess", "os", "importlib", "pickle", "shelve", "ctypes")
 NETWORK_ALLOWED = {"llm.py"}

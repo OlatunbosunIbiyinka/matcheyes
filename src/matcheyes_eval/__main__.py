@@ -5,6 +5,7 @@ python -m matcheyes_eval tune --seeds 20
 python -m matcheyes_eval stage3 --split development --seeds 20
 python -m matcheyes_eval stage4 --split development --seeds 20 --fault-seeds 5
 python -m matcheyes_eval redteam --split development --seeds 5
+python -m matcheyes_eval stage6 --split development --seeds 2
 python -m matcheyes_eval llm --profile live            (needs MATCHEYES_LLM_* in the environment)
 python -m matcheyes_eval llm --profile overclaiming    (SIMULATED; not a language model)
 """
@@ -30,6 +31,7 @@ from matcheyes_eval.stage2 import (
 )
 from matcheyes_eval.stage3 import evaluate_stage3, format_stage3
 from matcheyes_eval.stage4 import evaluate_stage4, format_stage4
+from matcheyes_eval.stage6 import evaluate_stage6, format_stage6
 
 TUNING_GRID = [
     (z, w, b) for w, b in ((10, 10), (10, 20), (15, 15), (15, 30)) for z in (2.0, 2.5, 3.0)
@@ -59,6 +61,10 @@ def main(argv: list[str] | None = None) -> int:
     red.add_argument("--split", choices=["development", "held-out"], default="development")
     red.add_argument("--seeds", type=int, default=5)
     red.add_argument("--fault-matches", type=int, default=None)
+    per = sub.add_parser("stage6", help="Stage 6 audience views and feeds vs verified insights.")
+    per.add_argument("--split", choices=["development", "held-out"], default="development")
+    per.add_argument("--seeds", type=int, default=2)
+    per.add_argument("--tamper-matches", type=int, default=None)
     llm = sub.add_parser("llm", help="Stage 5 LLM-path evaluation (live or SIMULATED profile).")
     llm.add_argument("--profile", choices=["live", *PROFILES], default="live")
     llm.add_argument("--split", choices=["development", "held-out"], default="development")
@@ -75,6 +81,11 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "llm":
         return _llm(args)
 
+    if args.command == "stage6":
+        cases = build_cases(seeds_for(args.split, args.seeds))
+        stage6 = evaluate_stage6(cases, args.split, args.seeds, args.tamper_matches)
+        sys.stdout.write(format_stage6(stage6) + "\n")
+        return 0
     if args.command == "redteam":
         cases = build_cases(seeds_for(args.split, args.seeds))
         red_results = evaluate_redteam(cases, args.split, args.seeds, args.fault_matches)

@@ -31,8 +31,8 @@ See [`docs/architecture.md`](docs/architecture.md).
 
 ## Status
 
-Built in explicit, reviewed stages. **Current: Stage 5 — Evidence audit, model evaluation and
-verification hardening.**
+Built in explicit, reviewed stages. **Current: Stage 6 — Personalization (Fan / Broadcaster /
+Analyst), a deterministic presentation layer over verified insights.**
 
 | Stage | Scope | Status |
 | --- | --- | --- |
@@ -42,8 +42,8 @@ verification hardening.**
 | 2 | Deterministic football intelligence: metrics, statistical shifts, evidence, candidate moments (frozen baseline) | Done |
 | 3 | Deterministic contextual strengthening: match context, contextual baselines, multi-signal patterns, persistence, uncertainty, ranking | Done |
 | 4 | Agentic investigation: competing explanations, typed tools, challenger, deterministic verifier and claim ladder; first claims above `associated` | Done |
-| 5 | Evidence audit and verification hardening: lineage, provenance replay, entailment, independent claim auditor, three-layer red team, blinded LLM evaluation harness (live LLM not yet evaluated) | In review |
-| 6 | Personalization (Fan / Broadcaster / Analyst) | Not started |
+| 5 | Evidence audit and verification hardening: lineage, provenance replay, entailment, independent claim auditor, three-layer red team, blinded LLM evaluation harness (live LLM not yet evaluated) | Done |
+| 6 | Personalization (Fan / Broadcaster / Analyst): audience views and feeds over verified insights, preferences for relevance only, independent view audit, presentation red team (no user study yet) | In review |
 | 7 | Product UX | Not started |
 | 8 | Azure / cloud-native | Not started |
 | 9 | Production readiness | Not started |
@@ -66,6 +66,10 @@ uv run python -m matcheyes analyse data/fixtures/minimal_match --json analysis.j
 # configured through MATCHEYES_LLM_* environment variables)
 uv run python -m matcheyes investigate data/fixtures/minimal_match
 
+# The same insights for one audience (presentation only; the verified truth is unchanged).
+# --club / --player take IDs, --metric a metric name; all need --audience
+uv run python -m matcheyes investigate data/fixtures/minimal_match --audience fan --club <club_id>
+
 # Synthetic matches (hidden-world tooling; never shipped with the engine)
 uv run python -m matcheyes_synth generate --scenario S02_press_surge   # default seed
 uv run python -m matcheyes_synth realism --split held-out --count 20
@@ -75,6 +79,7 @@ uv run python -m matcheyes_synth effects --count 20
 uv run python -m matcheyes_eval stage2 --split development --seeds 20
 uv run python -m matcheyes_eval stage4 --split development --seeds 20 --fault-seeds 5
 uv run python -m matcheyes_eval redteam --split development --seeds 5
+uv run python -m matcheyes_eval stage6 --split development --seeds 2
 # LLM path: --profile live needs MATCHEYES_LLM_*; other profiles are SIMULATED, not a model
 uv run python -m matcheyes_eval llm --profile faithful --split held-out --seeds 2 --matches 7
 ```
@@ -90,6 +95,7 @@ src/matcheyes/
   analytics/       ANALYTICS    deterministic metrics, detection, evidence objects
   agents/          AI REASONING investigator + challenger roles, typed tools, verifier, narrative
   orchestration/   WORKFLOW     explicit, bounded investigation flow and traces
+  personalization/ PRESENTATION audience views and feeds of verified insights, view audit
   api/             PRESENTATION HTTP boundary for the web app
 src/matcheyes_synth/  HIDDEN    fictional league, hidden state, scenarios, generator (never shipped)
 src/matcheyes_eval/   HIDDEN    scores engine output against the answer key (never shipped)
@@ -115,5 +121,6 @@ The web app (`web/`) and infrastructure (`infra/`) are added in Stages 7 and 8.
 - [Contextual evidence](docs/contextual-evidence.md) and [Stage 3 evaluation](docs/stage3-evaluation.md)
 - [Agentic investigation](docs/agentic-investigation.md) and [Stage 4 evaluation](docs/stage4-evaluation.md)
 - [Evidence audit](docs/evidence-audit.md) and [Stage 5 evaluation](docs/stage5-evaluation.md)
+- [Personalization](docs/personalization.md) and [Stage 6 evaluation](docs/stage6-evaluation.md)
 - [Development workflow](docs/development.md)
 - [Architecture decision records](docs/decisions/README.md)

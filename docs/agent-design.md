@@ -1,6 +1,6 @@
 # Agent design
 
-Status: **Stage 4 implemented**. The full method is in
+Status: **Stage 4 agents implemented; Stage 6 adds no agent**. The full method is in
 [agentic-investigation.md](agentic-investigation.md) and the rationale in
 [ADR-0010](decisions/0010-agentic-investigation.md). This page defines the bar every agent
 must clear, and records the agents that cleared it.
@@ -39,4 +39,23 @@ contextual reasoning). Agents are not added to increase the count.
 
 Rejected candidate agents: Match Analyst, Narrative, Verifier (all code); one specialist per
 explanation; Tactical and Performance Analysts (subsumed by typed tools and the shared rule
-table). Personalization remains a Stage 6 question.
+table).
+
+## Stage 6: personalization is not an agent
+
+A Personalization agent was considered and rejected
+([ADR-0012](decisions/0012-personalization-presentation-layer.md),
+[personalization.md](personalization.md)). Every step fails the admission rule:
+
+| Step | Deterministic implementation |
+| --- | --- |
+| Is the favourite club / player / metric involved? | lookup in the match and the insight's cited events |
+| How relevant is the insight? | weighted sum with a recorded basis |
+| Which sections does this audience see? | fixed per-audience table |
+| In which order? | sort by relevance, time, candidate ID |
+| What does the view say? | templates over the verified fields |
+
+A model would add an injection surface and non-reproducible relevance, and could drop a
+caveat or add causal wording. If a model renderer is added later, it may only rephrase
+sections the policy has already locked, its output must pass `audit_view`, and it falls back
+to the deterministic text.

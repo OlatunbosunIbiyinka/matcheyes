@@ -1,7 +1,8 @@
 # Evaluation
 
-Status: **deterministic evidence evaluation (Stages 2–3) and investigation evaluation
-(Stage 4)**. "It looked good in the demo" is not evidence.
+Status: **deterministic evidence evaluation (Stages 2–3), investigation evaluation (Stage 4),
+verification hardening (Stage 5) and personalization (Stage 6)**. "It looked good in the demo"
+is not evidence.
 
 | Layer | Method | Introduced |
 | --- | --- | --- |
@@ -12,7 +13,7 @@ Status: **deterministic evidence evaluation (Stages 2–3) and investigation eva
 | Contextual evidence | The same planted-truth protocol, reported side by side with the frozen Stage 2 baseline ([report](stage3-evaluation.md)) | Stage 3 |
 | Agents and verification | Contract, tool, retry and failure tests; hidden-truth isolation tests; planted / twin (by trigger type) / control / decoy claim rates; unsupported-claim and insufficient-evidence rates; verifier fault injection; determinism ([report](stage4-evaluation.md)) | Stage 4 |
 | Verification hardening | Evidence lineage; independent claim and narrative audit; three-layer red team (assessment, evidence tampering, insight tampering); false-rejection and valid-case tests; audited decoys; blinded LLM-path harness with repeatability and ablation ([report](stage5-evaluation.md)) | Stage 5 |
-| Personalization | Same verified claim set across Fan / Broadcaster / Analyst and across languages | Stage 6 |
+| Personalization | Construction invariants and an independent view audit on every view; same mandatory core across Fan / Broadcaster / Analyst; preference safety; feed placement; presentation red team (English only; no user study) ([report](stage6-evaluation.md)) | Stage 6 |
 | Narrative quality | Rubric-based evaluation (Foundry evaluators where verified) | Stages 5–10 |
 
 ## Planted-truth metrics
@@ -109,6 +110,25 @@ Stage 4 is judged on integrity first, then discrimination
 
 Twins are reported by trigger type: only untriggered twins give a clean false-attribution
 comparison, because observable-trigger twins keep the trigger and its background response.
+
+## Stage 6 objectives and results
+
+Stage 6 is judged on truthfulness first ([stage6-evaluation.md](stage6-evaluation.md)). It
+uses no hidden truth: every measure compares a view with the verified insight it wraps. Only
+the invariants have a target (zero); everything else is reported as measured. Held-out, 2
+seeds, 1,686 insights (562 clean, 1,124 compromised by Stage 5 tampering), 40,464 views:
+
+| Objective | Held-out |
+| --- | --- |
+| Views failing construction / fingerprint mismatches / flagged by the view audit | 0 / 0 / 0 |
+| Insights changed by personalizing | 0 |
+| Mandatory core differs across audiences | 0 of 1,686 |
+| Preference changes a section (other than the involvement line) or a feed placement | 0 |
+| Compromised insights hidden or moved out of the primary feed | 0 of 1,124 per audience |
+| Presentation faults caught by `audit_view` | 88,565 of 88,565 (27 types) |
+| Audience checklist coverage (fan / broadcaster / analyst) | 100% / 100% / 100% |
+
+No user study has been run: usefulness to real audiences is unmeasured.
 
 ## Test categories
 

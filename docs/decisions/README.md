@@ -16,6 +16,7 @@ records link to their replacement.
 | [0009](0009-contextual-evidence.md) | Contextual evidence and multi-signal reasoning | Proposed |
 | [0010](0010-agentic-investigation.md) | Agentic investigation and verification topology (orchestration pattern, MAF not adopted in Stage 4, verification and claim model) | Proposed |
 | [0011](0011-evidence-audit-and-verification-hardening.md) | Evidence audit and verification hardening (provenance replay, entailment, independent auditor and lineage, blinded LLM evaluation with simulated fallback) | Accepted |
+| [0012](0012-personalization-presentation-layer.md) | Personalization is a derived presentation layer over verified insights (source held by reference and fingerprinted, deterministic policy, audit before and after, preferences relevance-only, LLM excluded from relevance) | Accepted |
 
 ## Planned (decided at the stage where evidence exists)
 

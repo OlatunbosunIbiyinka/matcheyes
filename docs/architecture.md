@@ -1,7 +1,7 @@
 # Architecture
 
-Status: **deterministic engine (Stages 0–3) plus agentic investigation (Stage 4)**. Azure and
-presentation choices remain open.
+Status: **deterministic engine (Stages 0–3), agentic investigation (Stage 4), evidence audit
+(Stage 5) and deterministic personalization (Stage 6)**. Azure and web choices remain open.
 
 ## Principle
 
@@ -15,7 +15,7 @@ may and may not do.
 | AI REASONING | `agents` (investigator, challenger) | Chooses explanations and evidence requests; assesses. Structured output only. May not invent facts. |
 | EVIDENCE | `analytics` (objects), `agents` (typed tools, deterministic verifier) | Every claim links to tool facts and source events; the verifier can only keep or downgrade. |
 | NARRATIVE | `agents/narrative.py` (templated code) | Renders *verified* findings; labels fact vs interpretation. |
-| PRESENTATION | `api`, `web` | Personalizes detail and tone, never the underlying facts. |
+| PRESENTATION | `personalization`, `api`, `web` | Personalizes emphasis, order, depth and wording of *verified, audited* insights; never the underlying facts, strength, evidence or integrity. |
 
 ## Dependency rules
 
@@ -24,8 +24,12 @@ domain  <-  ingestion
 domain  <-  analytics
 domain, analytics  <-  agents
 domain, ingestion, analytics, agents  <-  orchestration
-orchestration (and below)  <-  api
+domain, analytics, agents, orchestration  <-  personalization
+personalization, orchestration (and below)  <-  api
 ```
+
+`orchestration` and the layers below it must not import `personalization`: presentation sits
+downstream of verified truth and cannot feed back into it.
 
 `domain`, `ingestion` and `analytics` must not import any AI or cloud SDK. These rules are
 enforced by `tests/architecture/test_layer_boundaries.py` and run in CI.
@@ -76,6 +80,24 @@ The method is in [agentic-investigation.md](agentic-investigation.md), the topol
 in [ADR-0010](decisions/0010-agentic-investigation.md) and the results in
 [stage4-evaluation.md](stage4-evaluation.md). Network access exists only in `agents/llm.py`.
 
+## Personalization (Stage 6)
+
+Personalization turns each verified, audited `FinalInsight` into a fan, broadcaster or analyst
+view in `matcheyes.personalization`:
+
+```
+FinalInsight ─► audit_insight ─► profile ─► policy + render (code) ─► PersonalizedInsight
+             ─► audit_view (independent) ─► build_feed ─► audience feed / CLI
+```
+
+A view holds its source insight by reference, with a SHA-256 fingerprint, and copies no truth
+field. Construction enforces the truth invariants; `audit_view` re-checks the rendered text
+against the source, the Stage 3 candidate and the match. Preferences (favourite club, player
+and metric) change relevance and order only. There is no agent and no model call. The method
+is in [personalization.md](personalization.md), the decision in
+[ADR-0012](decisions/0012-personalization-presentation-layer.md) and the results in
+[stage6-evaluation.md](stage6-evaluation.md).
+
 ## Observable world vs hidden world
 
 ```
@@ -100,7 +122,7 @@ EVENT -> DETECT -> INVESTIGATE -> VERIFY -> EXPLAIN -> PERSONALIZE
 | INVESTIGATE | agentic | investigator and challenger over typed tool evidence (Stage 4) |
 | VERIFY | deterministic | keep / downgrade claims through 9 gates, including provenance replay; audited independently ([evidence-audit.md](evidence-audit.md)) |
 | EXPLAIN | templated | narrative from verified findings only |
-| PERSONALIZE | agentic or templated | Fan / Broadcaster / Analyst (Stage 6) |
+| PERSONALIZE | deterministic, templated | Fan / Broadcaster / Analyst views of audited insights; preferences affect relevance only (Stage 6) |
 
 ## Real-time and insight lifecycle (to be designed in Stages 3–5, hardened in Stage 9)
 
