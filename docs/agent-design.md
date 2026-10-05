@@ -1,6 +1,9 @@
 # Agent design
 
-Status: **not started (Stage 4)**. This page defines the bar every agent must clear.
+Status: **Stage 4 implemented**. The full method is in
+[agentic-investigation.md](agentic-investigation.md) and the rationale in
+[ADR-0010](decisions/0010-agentic-investigation.md). This page defines the bar every agent
+must clear, and records the agents that cleared it.
 
 ## Admission rule
 
@@ -21,14 +24,19 @@ contextual reasoning). Agents are not added to increase the count.
 | Failure behaviour | Timeout, invalid output, low confidence: what happens. |
 | Evaluation | How its value is measured (see `evaluation.md`). |
 
-## Candidate roles (to be validated against real data)
+## Stage 4 agents
 
-- Match Analyst: candidate insights from detected moments.
-- Tactical Analyst: pressure, progression, transitions, possession patterns.
-- Performance Analyst: player/team contribution.
-- Evidence/Verification: checks claims against analytics + source events; can reject.
-- Narrative: writes from verified findings only; labels fact vs interpretation.
-- Personalization: audience adaptation of presentation, never facts.
+| Field | Investigator | Challenger |
+| --- | --- | --- |
+| Responsibility | Choose which explanations to test and which evidence to fetch; assess each against the evidence; propose a leading explanation and strength | Name plausible alternatives that were not tested or not eliminated, and request evidence to test them |
+| Reason to exist | Weighing competing explanations against mixed evidence is judgement | A separate adversarial turn counters confirmation bias |
+| Inputs | `AgentTask`: case file, evidence items, tested explanations | `AgentTask` plus the assessment |
+| Outputs | `InvestigationPlan`, `Assessment` | `Challenge` |
+| Tools | Requests only: eight typed tools run by the orchestrator | Requests only, same tools |
+| Boundaries | Cites facts only via `FactAssertion`; never computes statistics, invents events or sees hidden truth | Cannot assert facts or change statuses |
+| Failure behaviour | Retry once; then the explanation is `unavailable` and the Stage 3 candidate is kept | Retry once; then the assessment is verified as it stands |
+| Evaluation | Planted / twin / control / decoy claim rates; downgrade rate | Alternatives gate; fault injection (dropped alternatives) |
 
-Orchestration pattern (sequential / concurrent / handoff / manager) is chosen in Stage 4 and
-recorded as an ADR.
+Rejected candidate agents: Match Analyst, Narrative, Verifier (all code); one specialist per
+explanation; Tactical and Performance Analysts (subsumed by typed tools and the shared rule
+table). Personalization remains a Stage 6 question.

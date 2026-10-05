@@ -43,7 +43,12 @@ are results to report, not pass/fail thresholds:
 uv run python -m matcheyes_eval tune --seeds 20                       # development seeds only
 uv run python -m matcheyes_eval stage2 --split development --seeds 20
 uv run python -m matcheyes_eval stage2 --split held-out --seeds 20    # only with a frozen config
+uv run python -m matcheyes_eval stage3 --split development --seeds 20 # Stage 2 vs Stage 3
+uv run python -m matcheyes_eval stage3 --split held-out --seeds 20    # only with frozen code
 ```
+
+`python -m matcheyes analyse <match_dir> --contextual` prints Stage 3 contextual candidates
+after the Stage 2 analysis.
 
 ## Coding standards
 

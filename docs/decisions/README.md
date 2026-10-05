@@ -12,15 +12,16 @@ records link to their replacement.
 | [0005](0005-observable-and-hidden-worlds.md) | Separate observable match data from hidden ground truth | Accepted |
 | [0006](0006-pydantic-for-boundary-models.md) | Pydantic v2 for boundary models | Accepted |
 | [0007](0007-generator-calibration.md) | Generator calibration and acceptance | Accepted |
-| [0008](0008-deterministic-analytics-design.md) | Deterministic analytics design | Proposed |
+| [0008](0008-deterministic-analytics-design.md) | Deterministic analytics design | Accepted |
+| [0009](0009-contextual-evidence.md) | Contextual evidence and multi-signal reasoning | Proposed |
+| [0010](0010-agentic-investigation.md) | Agentic investigation and verification topology (orchestration pattern, MAF not adopted in Stage 4, verification and claim model) | Proposed |
+| [0011](0011-evidence-audit-and-verification-hardening.md) | Evidence audit and verification hardening (provenance replay, entailment, independent auditor and lineage, blinded LLM evaluation with simulated fallback) | Accepted |
 
 ## Planned (decided at the stage where evidence exists)
 
 | Topic | Stage |
 | --- | --- |
-| Agent orchestration pattern | 4 |
-| Use of Microsoft Agent Framework and Microsoft Foundry | 3–4 |
-| Verification and confidence model | 5 |
+| Microsoft Foundry (model hosting, tracing, evaluation) | 6–8 |
 | Web frontend stack | 7 |
 | Azure Container Apps vs AKS | 8 |
 | Data store selection | 8 |

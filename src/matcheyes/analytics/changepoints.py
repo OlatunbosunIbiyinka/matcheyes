@@ -107,8 +107,16 @@ def _clustered_variance(num: Sequence[float], den: Sequence[float], value: float
 def compare(
     series: Series, spec: MetricSpec, t: int, width: int, baseline: int | None = None
 ) -> Shift | None:
-    before = _window(series, spec, max(0, t - (baseline or width)), t)
-    after = _window(series, spec, t, t + width)
+    return compare_spans(series, spec, (max(0, t - (baseline or width)), t), (t, t + width))
+
+
+def compare_spans(
+    series: Series, spec: MetricSpec, before_span: tuple[int, int], after_span: tuple[int, int]
+) -> Shift | None:
+    """Compare two arbitrary bin spans [lo, hi); the shift is anchored at the after-span start."""
+    t = after_span[0]
+    before = _window(series, spec, *before_span)
+    after = _window(series, spec, *after_span)
     if before is None or after is None:
         return None
     (b, var_b), (a, var_a) = before, after

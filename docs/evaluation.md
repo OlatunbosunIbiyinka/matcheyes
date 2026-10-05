@@ -1,7 +1,7 @@
 # Evaluation
 
-Status: **strategy + ground-truth design (Stage 1)**. "It looked good in the demo" is not
-evidence.
+Status: **deterministic evidence evaluation (Stages 2–3) and investigation evaluation
+(Stage 4)**. "It looked good in the demo" is not evidence.
 
 | Layer | Method | Introduced |
 | --- | --- | --- |
@@ -9,9 +9,9 @@ evidence.
 | Ingestion | Schema validation + match-level invariants on fixtures and every generated match | Stage 1 |
 | Generator | Determinism (hash), invariants, realism bands, planted effect size above seed noise | Stage 1b |
 | Analytics | Deterministic unit tests with hand-computed expectations; mechanism-level scoring against planted truth, twins, controls and decoys ([report](stage2-evaluation.md)) | Stage 2 |
-| Insights | Planted-truth scoring (below) | Stage 3 onwards |
-| Agents | Structured-output validity, routing, failure handling | Stage 4 |
-| Verification | Decoy and control false-claim rates; seeded unsupported claims rejected or downgraded | Stage 5 |
+| Contextual evidence | The same planted-truth protocol, reported side by side with the frozen Stage 2 baseline ([report](stage3-evaluation.md)) | Stage 3 |
+| Agents and verification | Contract, tool, retry and failure tests; hidden-truth isolation tests; planted / twin (by trigger type) / control / decoy claim rates; unsupported-claim and insufficient-evidence rates; verifier fault injection; determinism ([report](stage4-evaluation.md)) | Stage 4 |
+| Verification hardening | Evidence lineage; independent claim and narrative audit; three-layer red team (assessment, evidence tampering, insight tampering); false-rejection and valid-case tests; audited decoys; blinded LLM-path harness with repeatability and ablation ([report](stage5-evaluation.md)) | Stage 5 |
 | Personalization | Same verified claim set across Fan / Broadcaster / Analyst and across languages | Stage 6 |
 | Narrative quality | Rubric-based evaluation (Foundry evaluators where verified) | Stages 5–10 |
 
@@ -35,6 +35,80 @@ The engine never sees the key ([ADR-0005](decisions/0005-observable-and-hidden-w
 Reporting rules: many seeds per scenario (target 20), held-out test seeds only, full
 distributions with intervals, and failures shown alongside successes. See
 [synthetic-data.md](synthetic-data.md#evaluation-hygiene-so-ground-truth-measures-rather-than-flatters-matcheyes).
+
+## Development versus held-out protocol
+
+* Development seeds (from 10000) are the only seeds used for design and tuning decisions. The
+  tuning code refuses held-out seeds.
+* Held-out seeds (from 900000) are evaluated once per stage, with a frozen configuration. Their
+  results must not feed back into implementation decisions.
+* Each evaluated stage reports development and held-out results side by side, including where
+  held-out results are worse.
+
+## Planted versus twin
+
+Each planted scenario has a same-seed counterfactual twin with every intervention removed. The
+twin keeps scripted goals, red cards and substitutions, so it still contains real game-state
+swings and natural momentum changes. The twin rate is therefore a **background rate**: how
+often the same evidence appears without the planted cause. It is not a pure false-positive
+rate. The headline quantity is the **planted-versus-twin gap**: does the engine make planted
+changes more distinguishable from ordinary match variation?
+
+## Controls and decoys
+
+* **Control (S01):** no interventions. We report the density of candidate moments per match.
+  Many reflect real game-state swings; density matters because a crowded shortlist is not
+  useful.
+* **Decoys (S07, S08):** windows where something salient happens without a planted cause. We
+  report how often a candidate moment for the decoy team falls in the decoy window, and
+  whether any claim exceeds the decoy's ceiling. The required number of ceiling violations is
+  zero.
+
+## Stage 2 frozen baseline
+
+Stage 2 (analytics 0.1.0, ADR-0008) is frozen. Its held-out results are the reference that
+Stage 3 is compared against:
+
+| Measure | Held-out |
+| --- | --- |
+| Evidence recall, planted / twin | 34% / 29% |
+| Moment recall, planted / twin | 32% / 24% |
+| Mean scored-mechanism coverage | 18% |
+| High-regain and pressing-success evidence, planted / twin | 15% / 0% |
+| Shift moments per control match | about 5.7 |
+| S07 / S08 decoy-window moment rate | 50% / 35% |
+| Claims above `associated` | 0 |
+
+## Stage 3 objectives
+
+Stage 3 is judged against the Stage 2 baseline on the same seeds, development and held-out:
+
+1. Widen the planted-versus-twin evidence gap.
+2. Reduce unnecessary moment density in controls.
+3. Reduce decoy-window hits where possible.
+4. Keep zero claims above `associated`.
+5. Keep every evidence object traceable to observable event IDs.
+6. Avoid materially increasing background (twin) evidence.
+
+Success does not mean every number improves. Trade-offs are reported as trade-offs.
+
+## Stage 4 objectives and results
+
+Stage 4 is judged on integrity first, then discrimination
+([stage4-evaluation.md](stage4-evaluation.md)). The table gives held-out results.
+
+| Objective | Held-out |
+| --- | --- |
+| Zero unsupported, untraceable, temporally invalid or above-ceiling final claims | 0 of 6,849 claims |
+| Verifier catches injected corruptions | 3,108 of 3,108 (8 corruption types) |
+| Deterministic investigations | 0 of 10 re-runs differ |
+| Insufficient-evidence rate | 71.5% |
+| Untriggered planted vs twin, any explanation at hypothesised+ | 10% vs 8% (no reliable gap) |
+| Hypothesised+ claims per control match / supported | 2.5 / 0 |
+| S07 / S08 decoy ceiling exceeded | 30% / 10% (mostly post-goal score-state responses) |
+
+Twins are reported by trigger type: only untriggered twins give a clean false-attribution
+comparison, because observable-trigger twins keep the trigger and its background response.
 
 ## Test categories
 

@@ -36,9 +36,9 @@ class Timeline:
         bins: list[MinuteBin] = []
         self._offset: dict[Period, int] = {}
         for period in sorted(last_minute):
-            self._offset[period] = len(bins)
+            offset = self._offset[period] = len(bins)
             bins.extend(
-                MinuteBin(index=len(bins) + m, period=period, minute=m)
+                MinuteBin(index=offset + m, period=period, minute=m)
                 for m in range(last_minute[period] + 1)
             )
         self.bins: tuple[MinuteBin, ...] = tuple(bins)

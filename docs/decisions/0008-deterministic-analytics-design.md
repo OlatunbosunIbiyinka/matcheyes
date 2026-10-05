@@ -1,6 +1,6 @@
 # ADR-0008: Deterministic analytics design
 
-- Status: Proposed
+- Status: Accepted (2026-10-04, with Stage 2 approval)
 - Date: 2026-10-04
 - Stage: 2
 

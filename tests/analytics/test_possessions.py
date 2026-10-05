@@ -50,3 +50,4 @@ def test_timeline_covers_each_period_minute_by_minute() -> None:
     assert timeline.index_of(2, 70_000) == 48
     assert timeline.bins[48].label == "47'"
     assert timeline.period_start_indices() == (0, 47)
+    assert [b.index for b in timeline.bins] == list(range(len(timeline)))

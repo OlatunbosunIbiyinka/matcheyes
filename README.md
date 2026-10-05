@@ -31,17 +31,18 @@ See [`docs/architecture.md`](docs/architecture.md).
 
 ## Status
 
-Built in explicit, reviewed stages. **Current: Stage 2 — Deterministic football intelligence.**
+Built in explicit, reviewed stages. **Current: Stage 5 — Evidence audit, model evaluation and
+verification hardening.**
 
 | Stage | Scope | Status |
 | --- | --- | --- |
 | 0 | Project foundation | Done |
 | 1 | Synthetic data design: observable model, hidden truth, scenarios, invariants | Done |
 | 1b | Seeded generator implementation + calibration | Done |
-| 2 | Deterministic football intelligence | In review |
-| 3 | First end-to-end insight | Not started |
-| 4 | Agentic architecture (Microsoft Agent Framework) | Not started |
-| 5 | Evidence + verification | Not started |
+| 2 | Deterministic football intelligence: metrics, statistical shifts, evidence, candidate moments (frozen baseline) | Done |
+| 3 | Deterministic contextual strengthening: match context, contextual baselines, multi-signal patterns, persistence, uncertainty, ranking | Done |
+| 4 | Agentic investigation: competing explanations, typed tools, challenger, deterministic verifier and claim ladder; first claims above `associated` | Done |
+| 5 | Evidence audit and verification hardening: lineage, provenance replay, entailment, independent claim auditor, three-layer red team, blinded LLM evaluation harness (live LLM not yet evaluated) | In review |
 | 6 | Personalization (Fan / Broadcaster / Analyst) | Not started |
 | 7 | Product UX | Not started |
 | 8 | Azure / cloud-native | Not started |
@@ -61,6 +62,10 @@ uv run matcheyes        # smoke test the package
 # Deterministic analysis of any observable match directory
 uv run python -m matcheyes analyse data/fixtures/minimal_match --json analysis.json
 
+# Investigate each Stage 3 candidate (deterministic reference reasoner; --llm uses a model
+# configured through MATCHEYES_LLM_* environment variables)
+uv run python -m matcheyes investigate data/fixtures/minimal_match
+
 # Synthetic matches (hidden-world tooling; never shipped with the engine)
 uv run python -m matcheyes_synth generate --scenario S02_press_surge   # default seed
 uv run python -m matcheyes_synth realism --split held-out --count 20
@@ -68,6 +73,10 @@ uv run python -m matcheyes_synth effects --count 20
 
 # Score analytics against planted truth (tune on development; held-out once)
 uv run python -m matcheyes_eval stage2 --split development --seeds 20
+uv run python -m matcheyes_eval stage4 --split development --seeds 20 --fault-seeds 5
+uv run python -m matcheyes_eval redteam --split development --seeds 5
+# LLM path: --profile live needs MATCHEYES_LLM_*; other profiles are SIMULATED, not a model
+uv run python -m matcheyes_eval llm --profile faithful --split held-out --seeds 2 --matches 7
 ```
 
 Full workflow: [`docs/development.md`](docs/development.md).
@@ -79,8 +88,8 @@ src/matcheyes/
   domain/          FACTS        typed football domain model
   ingestion/       FACTS        load + validate synthetic data -> domain
   analytics/       ANALYTICS    deterministic metrics, detection, evidence objects
-  agents/          AI REASONING specialist agents (structured in, structured out)
-  orchestration/   WORKFLOW     explicit EVENT->DETECT->INVESTIGATE->VERIFY->EXPLAIN->PERSONALIZE
+  agents/          AI REASONING investigator + challenger roles, typed tools, verifier, narrative
+  orchestration/   WORKFLOW     explicit, bounded investigation flow and traces
   api/             PRESENTATION HTTP boundary for the web app
 src/matcheyes_synth/  HIDDEN    fictional league, hidden state, scenarios, generator (never shipped)
 src/matcheyes_eval/   HIDDEN    scores engine output against the answer key (never shipped)
@@ -103,5 +112,8 @@ The web app (`web/`) and infrastructure (`infra/`) are added in Stages 7 and 8.
 - [Causal claims ladder](docs/causal-claims.md)
 - [Evaluation](docs/evaluation.md)
 - [Deterministic metrics](docs/metrics.md) and [Stage 2 evaluation](docs/stage2-evaluation.md)
+- [Contextual evidence](docs/contextual-evidence.md) and [Stage 3 evaluation](docs/stage3-evaluation.md)
+- [Agentic investigation](docs/agentic-investigation.md) and [Stage 4 evaluation](docs/stage4-evaluation.md)
+- [Evidence audit](docs/evidence-audit.md) and [Stage 5 evaluation](docs/stage5-evaluation.md)
 - [Development workflow](docs/development.md)
 - [Architecture decision records](docs/decisions/README.md)

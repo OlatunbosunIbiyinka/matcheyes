@@ -96,12 +96,34 @@ def _side_ok(side: Side, evidence_team: str, team: str) -> bool:
     return (evidence_team == team) == (side == "team")
 
 
+def detection_window(insight: ExpectedInsight, clock: Clock) -> tuple[float, float]:
+    start = clock.seconds(insight.window_start)
+    return start - EARLY_TOLERANCE_S, start + insight.max_detection_latency_s
+
+
+def metric_mechanisms(
+    insight: ExpectedInsight, metric: str, team_id: str, direction: str
+) -> tuple[MechanismSignal, ...]:
+    """Scored mechanisms of the insight that a change in this metric would count as finding."""
+    found = []
+    for mech in insight.mechanisms:
+        expected = MECHANISM_METRICS.get(mech)
+        if (
+            expected is not None
+            and metric == expected.metric
+            and _side_ok(expected.side, team_id, insight.team_id)
+            and expected.direction in (None, direction)
+        ):
+            found.append(mech)
+    return tuple(found)
+
+
 def score_insight(
     insight: ExpectedInsight, analysis: MatchAnalysis, match: ObservableMatch
 ) -> InsightScore:
     clock = Clock(match)
     start = clock.seconds(insight.window_start)
-    lo, hi = start - EARLY_TOLERANCE_S, start + insight.max_detection_latency_s
+    lo, hi = detection_window(insight, clock)
     found: dict[str, float] = {}
     matched: set[str] = set()
 
@@ -112,16 +134,9 @@ def score_insight(
         if not within(e.at):
             continue
         if isinstance(e, MetricShiftEvidence):
-            for mech in insight.mechanisms:
-                expected = MECHANISM_METRICS.get(mech)
-                if (
-                    expected is not None
-                    and e.metric == expected.metric
-                    and _side_ok(expected.side, e.team_id, insight.team_id)
-                    and expected.direction in (None, e.direction)
-                ):
-                    found.setdefault(mech.value, clock.seconds(e.at))
-                    matched.add(e.evidence_id)
+            for mech in metric_mechanisms(insight, e.metric, e.team_id, e.direction):
+                found.setdefault(mech.value, clock.seconds(e.at))
+                matched.add(e.evidence_id)
         elif (
             isinstance(e, PlayerInvolvementEvidence)
             and MechanismSignal.PLAYER_INVOLVEMENT_UP in insight.mechanisms
