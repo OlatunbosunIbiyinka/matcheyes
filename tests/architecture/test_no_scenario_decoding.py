@@ -1,5 +1,5 @@
-"""The analytics, agent, orchestration and personalization layers must not know the synthetic
-world they are evaluated on.
+"""The analytics, agent, orchestration, personalization and lifecycle layers must not know the
+synthetic world they are evaluated on.
 
 Static checks that no source in those layers mentions a scenario ID, a synthetic club, the
 generator package or a hidden-state vocabulary term. Behavioural separation (no imports of
@@ -20,6 +20,7 @@ INFERENCE_FILES = [
     *python_files("matcheyes/agents"),
     *python_files("matcheyes/orchestration"),
     *python_files("matcheyes/personalization"),
+    *python_files("matcheyes/lifecycle"),
 ]
 FORBIDDEN_WORDS = (
     "matcheyes_synth",

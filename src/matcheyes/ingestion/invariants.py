@@ -76,6 +76,17 @@ def validate_match(match: ObservableMatch) -> ValidationReport:
     return ValidationReport(tuple(v for check in checks for v in check(match)))
 
 
+def validate_prefix(match: ObservableMatch) -> ValidationReport:
+    """The same rules for a match still in progress: the events so far, in sequence order.
+
+    Every rule of `validate_match` applies except that the match need not be finished: a period
+    may still be open and the second half need not have started. A violation inside the prefix
+    (a gap, a second start, a clock going backwards, an unknown player) is still reported.
+    """
+    checks = (_identity, _sequence, _open_periods, _participation, _restarts)
+    return ValidationReport(tuple(v for check in checks for v in check(match)))
+
+
 def _identity(match: ObservableMatch) -> Iterator[Violation]:
     seen: set[Identifier] = set()
     for event in match.events:
@@ -105,6 +116,14 @@ def _sequence(match: ObservableMatch) -> Iterator[Violation]:
 
 
 def _periods(match: ObservableMatch) -> Iterator[Violation]:
+    yield from _period_rules(match, complete=True)
+
+
+def _open_periods(match: ObservableMatch) -> Iterator[Violation]:
+    yield from _period_rules(match, complete=False)
+
+
+def _period_rules(match: ObservableMatch, complete: bool) -> Iterator[Violation]:
     open_period: int | None = None
     started: set[int] = set()
     ended: set[int] = set()
@@ -149,7 +168,7 @@ def _periods(match: ObservableMatch) -> Iterator[Violation]:
                 event.sequence,
             )
 
-    if started != {1, 2} or ended != {1, 2}:
+    if complete and (started != {1, 2} or ended != {1, 2}):
         yield Violation(ViolationCode.PERIOD_STRUCTURE, "a match has exactly periods 1 and 2")
 
 

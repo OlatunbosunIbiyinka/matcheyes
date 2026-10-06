@@ -94,6 +94,10 @@ unique IDs and numbers) and distinct clubs.
 | `card_sequence_invalid` | A second booking is `second_yellow`, and only after a yellow. |
 | `restart_invalid` | Each period opens with a kick-off. After a goal or own goal, the conceding team kicks off. No kick-offs mid-play. |
 
+**Prefix level (`validate_prefix`, Stage 7):** the same rules on a match in progress, except those
+that need the whole match. Only periods that have started are required, and the last period may
+still be open.
+
 Statistical realism (event volumes, completion rates, ...) is a **generator acceptance check**,
 not an invariant. See [synthetic-data.md](synthetic-data.md#realism-acceptance).
 
@@ -106,3 +110,28 @@ not an invariant. See [synthetic-data.md](synthetic-data.md#realism-acceptance).
 ```
 
 A tiny hand-built valid match is committed at `data/fixtures/minimal_match/`, used by tests.
+
+## Live delivery (Stage 7)
+
+During a match the same events arrive one at a time, in any order. They are identified by
+`(match_id, event_id)` and ordered by `sequence`; `matcheyes.ingestion.log.EventLog` admits
+them:
+
+* an exact duplicate (byte-identical canonical JSON) is ignored;
+* a different payload under an existing `event_id`, or a different event under an existing
+  `sequence`, is a **conflict** and is refused. This first-writer-wins rule is a temporary Stage 7
+  ingestion policy, not a judgment that the first version is correct. Corrections are deferred,
+  and supporting them will require rebuilding the affected snapshots and revisions;
+* the **watermark** is the highest sequence up to which every event has arrived. Events beyond a
+  gap are buffered, and the data status is `data_incomplete` until the gap fills.
+
+Derived records, none of which are part of the observable feed:
+
+| Record | Content |
+| --- | --- |
+| `SnapshotHeader` | content-addressed ID, watermark, closed minute, `as_of`, digests of the prefix and of the team sheet |
+| `SnapshotRecord` | outcome (`evaluated` / `invalid` / `failed`), insight count, storylines established |
+| `Storyline` | key (team, metric, direction), first and current anchor, state (`open` / `withdrawn`), link to a replaced storyline, revisions |
+| `Revision` | number, snapshot, state, change kinds, the verified `FinalInsight` and its fingerprint, Stage 5 audit findings, withdrawal reason, chain fingerprints |
+
+See [living-insights.md](living-insights.md).

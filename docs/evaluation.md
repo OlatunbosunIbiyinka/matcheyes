@@ -1,7 +1,8 @@
 # Evaluation
 
 Status: **deterministic evidence evaluation (Stages 2–3), investigation evaluation (Stage 4),
-verification hardening (Stage 5) and personalization (Stage 6)**. "It looked good in the demo"
+verification hardening (Stage 5), personalization (Stage 6) and the insight lifecycle
+(Stage 7)**. "It looked good in the demo"
 is not evidence.
 
 | Layer | Method | Introduced |
@@ -14,6 +15,7 @@ is not evidence.
 | Agents and verification | Contract, tool, retry and failure tests; hidden-truth isolation tests; planted / twin (by trigger type) / control / decoy claim rates; unsupported-claim and insufficient-evidence rates; verifier fault injection; determinism ([report](stage4-evaluation.md)) | Stage 4 |
 | Verification hardening | Evidence lineage; independent claim and narrative audit; three-layer red team (assessment, evidence tampering, insight tampering); false-rejection and valid-case tests; audited decoys; blinded LLM-path harness with repeatability and ablation ([report](stage5-evaluation.md)) | Stage 5 |
 | Personalization | Construction invariants and an independent view audit on every view; same mandatory core across Fan / Broadcaster / Analyst; preference safety; feed placement; presentation red team (English only; no user study) ([report](stage6-evaluation.md)) | Stage 6 |
+| Insight lifecycle | Replay under reorder, shuffle, duplicates, conflicts, gaps, late fill, failure and tampering; byte-identical determinism; independent lifecycle audit with reproduction; lifecycle red team; storylines against planted truth ([report](stage7-evaluation.md)) | Stage 7 |
 | Narrative quality | Rubric-based evaluation (Foundry evaluators where verified) | Stages 5–10 |
 
 ## Planted-truth metrics
@@ -129,6 +131,32 @@ seeds, 1,686 insights (562 clean, 1,124 compromised by Stage 5 tampering), 40,46
 | Audience checklist coverage (fan / broadcaster / analyst) | 100% / 100% / 100% |
 
 No user study has been run: usefulness to real audiences is unmeasured.
+
+## Stage 7 objectives and results
+
+Stage 7 is judged on lifecycle properties under realistic delivery
+([stage7-evaluation.md](stage7-evaluation.md)): every match is replayed minute by minute in
+sequence order, then reordered, shuffled, duplicated, with conflicts, a gap and a late fill, a
+failed snapshot, tampered evidence and injected lifecycle faults. No targets were set. Held-out,
+1 seed per scenario, 17 matches, 1,696 snapshots, 242 storylines, 593 revisions:
+
+| Objective | Held-out |
+| --- | --- |
+| Canonical state independent of arrival order (bounded reorder, shuffle) | 17/17, 17/17 |
+| Replay byte-identical (fresh / repeated) | 2/2 / 17/17 |
+| Duplicates no-ops; conflicts, reused sequences and other-match events rejected | 17/17 each |
+| Gap: `DATA_INCOMPLETE`, no snapshot beyond the watermark; late fill equals reference | 17/17 |
+| No cited event outside its revision's snapshot; history unchanged by later events | 17/17 |
+| Append-only history; independent lifecycle audit clean (incl. reproduction) | 17/17 |
+| Pipeline failure: `FAILED`, feed `UNAVAILABLE`, no fallback | 17/17 |
+| Stale views flagged / compromised views warned | 923/923 / 714/714 |
+| Lifecycle faults caught by `audit_lifecycle` | 197 of 197 (14 types) |
+| Current revisions at full time equal the batch investigation | 17/17 |
+| Planted insights followed by a storyline; median first-detection latency | 3 of 7; 1,320 s |
+| Produced insights lost by the lifecycle (attribution) | 0 of 9,328; all 4 misses are upstream (no matching Stage 2 shift) |
+
+The latency is set by detection (confirmation after an onset), not by transport. Stage 7 is
+deterministic local recomputation, not production streaming.
 
 ## Test categories
 

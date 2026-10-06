@@ -13,7 +13,7 @@ from matcheyes.domain.events import (
     Substitution,
 )
 from matcheyes.domain.match import MatchEvent, ObservableMatch
-from matcheyes.ingestion.invariants import ViolationCode, validate_match
+from matcheyes.ingestion.invariants import ViolationCode, validate_match, validate_prefix
 from tests.support.builders import AWAY, HOME, minimal_match, pid
 
 V = ViolationCode
@@ -179,3 +179,28 @@ def test_conceding_team_must_kick_off(match: ObservableMatch) -> None:
 
 def test_unexpected_kick_off(match: ObservableMatch) -> None:
     assert V.RESTART_INVALID in validate_match(_replace(match, 2, kind=PassKind.KICK_OFF)).codes()
+
+
+def _prefix(match: ObservableMatch, length: int) -> ObservableMatch:
+    return match.model_copy(update={"events": match.events[:length]})
+
+
+def test_every_prefix_of_a_valid_match_is_a_valid_prefix(match: ObservableMatch) -> None:
+    for length in range(len(match.events) + 1):
+        report = validate_prefix(_prefix(match, length))
+        assert report.ok, (length, report.violations)
+
+
+def test_a_strict_prefix_is_still_not_a_complete_match(match: ObservableMatch) -> None:
+    for length in range(len(match.events)):
+        assert V.PERIOD_STRUCTURE in validate_match(_prefix(match, length)).codes()
+
+
+def test_prefix_validation_still_reports_violations_inside_the_prefix(
+    match: ObservableMatch,
+) -> None:
+    assert V.CLOCK_NOT_MONOTONIC in validate_prefix(_replace(match, 4, clock_ms=500)).codes()
+    assert V.SEQUENCE_GAP_OR_DUPLICATE in validate_prefix(_replace(match, 3, sequence=999)).codes()
+    restarted = _with_events(match, [*match.events[:5], match.events[0], *match.events[5:]])
+    assert V.PERIOD_STRUCTURE in validate_prefix(_prefix(restarted, 6)).codes()
+    assert V.PLAYER_NOT_ON_PITCH in validate_prefix(_replace(match, 2, player_id="x-99")).codes()

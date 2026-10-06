@@ -1,7 +1,8 @@
 # Architecture
 
 Status: **deterministic engine (Stages 0–3), agentic investigation (Stage 4), evidence audit
-(Stage 5) and deterministic personalization (Stage 6)**. Azure and web choices remain open.
+(Stage 5), deterministic personalization (Stage 6) and a snapshot-anchored insight lifecycle
+(Stage 7)**. Azure and web choices remain open.
 
 ## Principle
 
@@ -25,11 +26,13 @@ domain  <-  analytics
 domain, analytics  <-  agents
 domain, ingestion, analytics, agents  <-  orchestration
 domain, analytics, agents, orchestration  <-  personalization
-personalization, orchestration (and below)  <-  api
+domain, ingestion, analytics, agents, orchestration, personalization  <-  lifecycle
+lifecycle, personalization, orchestration (and below)  <-  api
 ```
 
 `orchestration` and the layers below it must not import `personalization`: presentation sits
-downstream of verified truth and cannot feed back into it.
+downstream of verified truth and cannot feed back into it. Nothing but `api` (and the CLI) may
+import `lifecycle`.
 
 `domain`, `ingestion` and `analytics` must not import any AI or cloud SDK. These rules are
 enforced by `tests/architecture/test_layer_boundaries.py` and run in CI.
@@ -98,6 +101,26 @@ is in [personalization.md](personalization.md), the decision in
 [ADR-0012](decisions/0012-personalization-presentation-layer.md) and the results in
 [stage6-evaluation.md](stage6-evaluation.md).
 
+## Insight lifecycle (Stage 7)
+
+A live match is a growing event log. `matcheyes.lifecycle` turns it into living insights
+without changing any earlier stage:
+
+```
+events (any order, duplicates, gaps) ─► EventLog (idempotent; conflicts rejected; contiguous watermark)
+  ─► one canonical snapshot per closed minute (content-addressed)
+  ─► unchanged Stages 2–5 on that snapshot only ─► verified FinalInsights + own-snapshot audit
+  ─► storyline reconciliation (deterministic identity) ─► append-only, chained revisions
+  ─► lifecycle feed (current / withdrawn / notices) ─► Stage 6 views of current revisions
+```
+
+The lifecycle decides identity and records history. Truth is still decided only by the
+pipeline, on one snapshot. An independent lifecycle audit re-derives every snapshot from the log
+and re-checks every revision against its own snapshot. The method is in
+[living-insights.md](living-insights.md), the decision in
+[ADR-0013](decisions/0013-snapshot-anchored-insight-lifecycle.md) and the results in
+[stage7-evaluation.md](stage7-evaluation.md).
+
 ## Observable world vs hidden world
 
 ```
@@ -117,18 +140,29 @@ EVENT -> DETECT -> INVESTIGATE -> VERIFY -> EXPLAIN -> PERSONALIZE
 
 | Step | Kind | Notes |
 | --- | --- | --- |
-| EVENT | deterministic | ingest, validate, order, de-duplicate |
+| EVENT | deterministic | ingest, validate, order, de-duplicate; contiguous watermark, conflicts rejected (Stage 7) |
 | DETECT | deterministic | momentum shifts, key moments; produces evidence objects |
 | INVESTIGATE | agentic | investigator and challenger over typed tool evidence (Stage 4) |
 | VERIFY | deterministic | keep / downgrade claims through 9 gates, including provenance replay; audited independently ([evidence-audit.md](evidence-audit.md)) |
 | EXPLAIN | templated | narrative from verified findings only |
 | PERSONALIZE | deterministic, templated | Fan / Broadcaster / Analyst views of audited insights; preferences affect relevance only (Stage 6) |
+| LIFECYCLE | deterministic | per closed minute: snapshot, re-run the pipeline, reconcile storylines, append revisions (Stage 7) |
 
-## Real-time and insight lifecycle (to be designed in Stages 3–5, hardened in Stage 9)
+## Real-time and insight lifecycle (Stage 7; infrastructure in Stage 8)
 
-Insights are versioned, not final: they can be created, updated, gain/lose confidence, become
-obsolete, or be superseded by later evidence. Concerns to address: event ordering, idempotency,
-duplicate and late events, latency, retries, correlation IDs.
+Stage 7 implements the lifecycle semantics as local, deterministic recomputation
+([ADR-0013](decisions/0013-snapshot-anchored-insight-lifecycle.md)):
+
+* ordering, idempotency, duplicates, late events and gaps are handled by the event log;
+* insights are versioned as storylines with append-only revisions (OPEN or WITHDRAWN, with
+  created, re-anchored, verdict, strength, explanation, integrity, evidence, withdrawn and
+  reinstated changes);
+* latency is bounded below by detection: at least about 15 match minutes after an onset (median
+  18–22 minutes from the planted window start in the evaluation).
+
+It is not production real-time streaming. Transport, storage, retries across processes and
+correlation IDs belong to the Stage 8 infrastructure decisions. Corrections to already-accepted
+events are rejected, not applied.
 
 ## Azure (to be decided in Stage 8)
 

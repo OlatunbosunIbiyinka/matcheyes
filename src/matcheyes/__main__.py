@@ -7,6 +7,10 @@ python -m matcheyes investigate <match_dir> Stage 4 investigation of each candid
     [--llm]                                 use the configured LLM (see agents/llm.py)
     [--audience fan|broadcaster|analyst]    Stage 6 audience feed (presentation only)
     [--club ID] [--player ID] [--metric M]  preferences; need --audience
+python -m matcheyes replay <match_dir>      Stage 7 lifecycle: replay the event log snapshot by
+                                            snapshot (one per closed minute) into storylines
+    [--json PATH]                           also write the canonical lifecycle state
+    [--audience ...] [--club ...] ...       Stage 6 view of the current revisions
 """
 
 import argparse
@@ -24,6 +28,8 @@ from matcheyes.analytics.analysis import MatchAnalysis, analyse_match
 from matcheyes.analytics.contextual import ContextualAnalysis, analyse_contextual
 from matcheyes.analytics.moments import Names
 from matcheyes.ingestion.io import load_observable_match
+from matcheyes.lifecycle.engine import replay
+from matcheyes.lifecycle.feed import LifecycleFeed, audience_feed, lifecycle_feed
 from matcheyes.orchestration.investigation import MatchInvestigation, investigate_match
 from matcheyes.personalization.contracts import Audience, PersonalizationProfile
 from matcheyes.personalization.feed import build_feed, format_feed
@@ -103,6 +109,47 @@ def format_investigation(investigation: MatchInvestigation) -> str:
     return "\n".join(lines)
 
 
+def format_lifecycle(feed: LifecycleFeed, storylines: int, revisions: int) -> str:
+    as_of = feed.as_of.display_minute if feed.as_of else "-"
+    lines = [
+        f"Lifecycle - {feed.match_id} (snapshot-anchored; one snapshot per closed minute)",
+        f"data: {feed.data_status.value}, watermark {feed.watermark}, {feed.buffered} buffered; "
+        f"latest snapshot {feed.snapshot_id or '-'} (end {as_of}); status {feed.status.value}",
+        f"{storylines} storylines, {revisions} revisions",
+    ]
+    if feed.unavailable_reason:
+        lines.append(f"current truth unavailable: {feed.unavailable_reason}")
+    lines += ["", "Current:"]
+    for r in feed.current:
+        if r.final is not None:
+            lines.append(
+                f"  {r.final.at.display_minute:>6} [{r.final.verdict.value} / "
+                f"{r.final.strength.value}] {r.storyline_id} r{r.number}"
+            )
+    lines.append("Withdrawn:")
+    lines += [f"  {r.storyline_id} r{r.number} ({r.withdrawal_reason})" for r in feed.withdrawn]
+    lines.append("Notices on the latest snapshot:")
+    lines += [f"  {n.storyline_id}: {n.text}" for n in feed.notices]
+    return "\n".join(lines)
+
+
+def _replay(args: argparse.Namespace, profile: PersonalizationProfile | None) -> int:
+    match = load_observable_match(args.match_dir)
+    engine = replay(match.info, match.events)
+    state = engine.state
+    if args.json:
+        args.json.write_text(state.model_dump_json(indent=2) + "\n", "utf-8", newline="\n")
+    feed = lifecycle_feed(state, engine.status())
+    revisions = sum(len(s.revisions) for s in state.storylines)
+    output = format_lifecycle(feed, len(state.storylines), revisions)
+    snapshot = engine.latest_snapshot()
+    if profile is not None and snapshot is not None:
+        view = audience_feed(state, profile, MatchWorkspace.build(snapshot.match))
+        output += f"\n\n{format_feed(view, Names(match.info))}"
+    sys.stdout.write(output + "\n")
+    return 0
+
+
 def _model(use_llm: bool) -> ReasoningModel | None:
     if not use_llm:
         return RuleBasedReasoner()
@@ -150,11 +197,22 @@ def main(argv: list[str] | None = None) -> int:
     investigate.add_argument("--club", help="Favourite club ID (needs --audience).")
     investigate.add_argument("--player", help="Favourite player ID (needs --audience).")
     investigate.add_argument("--metric", help="Favourite metric name (needs --audience).")
+    lifecycle = sub.add_parser("replay", help="Replay the event log into insight storylines.")
+    lifecycle.add_argument("match_dir", type=Path)
+    lifecycle.add_argument("--json", type=Path, help="Also write the lifecycle state as JSON.")
+    lifecycle.add_argument(
+        "--audience", choices=[a.value for a in Audience], help="Show a Stage 6 audience feed."
+    )
+    lifecycle.add_argument("--club", help="Favourite club ID (needs --audience).")
+    lifecycle.add_argument("--player", help="Favourite player ID (needs --audience).")
+    lifecycle.add_argument("--metric", help="Favourite metric name (needs --audience).")
     args = parser.parse_args(argv)
 
     if args.command is None:
         sys.stdout.write(f"MatchEyes {__version__} - See beyond the score.\n")
         return 0
+    if args.command == "replay":
+        return _replay(args, _profile(parser, args))
     profile = _profile(parser, args) if args.command == "investigate" else None
     match = load_observable_match(args.match_dir)
     if args.command == "investigate":

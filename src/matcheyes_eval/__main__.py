@@ -6,6 +6,8 @@ python -m matcheyes_eval stage3 --split development --seeds 20
 python -m matcheyes_eval stage4 --split development --seeds 20 --fault-seeds 5
 python -m matcheyes_eval redteam --split development --seeds 5
 python -m matcheyes_eval stage6 --split development --seeds 2
+python -m matcheyes_eval stage7 --split development --seeds 1 [--matches N] [--fresh-replays N]
+python -m matcheyes_eval stage7-attribution --split development --seeds 1 [--matches N]
 python -m matcheyes_eval llm --profile live            (needs MATCHEYES_LLM_* in the environment)
 python -m matcheyes_eval llm --profile overclaiming    (SIMULATED; not a language model)
 """
@@ -32,6 +34,8 @@ from matcheyes_eval.stage2 import (
 from matcheyes_eval.stage3 import evaluate_stage3, format_stage3
 from matcheyes_eval.stage4 import evaluate_stage4, format_stage4
 from matcheyes_eval.stage6 import evaluate_stage6, format_stage6
+from matcheyes_eval.stage7 import evaluate_stage7, format_stage7
+from matcheyes_eval.stage7_attribution import evaluate_attribution, format_attribution
 
 TUNING_GRID = [
     (z, w, b) for w, b in ((10, 10), (10, 20), (15, 15), (15, 30)) for z in (2.0, 2.5, 3.0)
@@ -65,6 +69,17 @@ def main(argv: list[str] | None = None) -> int:
     per.add_argument("--split", choices=["development", "held-out"], default="development")
     per.add_argument("--seeds", type=int, default=2)
     per.add_argument("--tamper-matches", type=int, default=None)
+    life = sub.add_parser("stage7", help="Stage 7 lifecycle under delivery perturbations.")
+    life.add_argument("--split", choices=["development", "held-out"], default="development")
+    life.add_argument("--seeds", type=int, default=1)
+    life.add_argument("--matches", type=int, default=None, help="Only the first N matches.")
+    life.add_argument("--fresh-replays", type=int, default=1, help="Uncached determinism runs.")
+    att = sub.add_parser(
+        "stage7-attribution", help="Stage 7: lost insights vs upstream detection limits."
+    )
+    att.add_argument("--split", choices=["development", "held-out"], default="development")
+    att.add_argument("--seeds", type=int, default=1)
+    att.add_argument("--matches", type=int, default=None, help="Only the first N matches.")
     llm = sub.add_parser("llm", help="Stage 5 LLM-path evaluation (live or SIMULATED profile).")
     llm.add_argument("--profile", choices=["live", *PROFILES], default="live")
     llm.add_argument("--split", choices=["development", "held-out"], default="development")
@@ -81,6 +96,16 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "llm":
         return _llm(args)
 
+    if args.command == "stage7":
+        cases = build_cases(seeds_for(args.split, args.seeds))[: args.matches]
+        stage7 = evaluate_stage7(cases, args.split, args.seeds, args.fresh_replays)
+        sys.stdout.write(format_stage7(stage7) + "\n")
+        return 0
+    if args.command == "stage7-attribution":
+        cases = build_cases(seeds_for(args.split, args.seeds))[: args.matches]
+        attribution = evaluate_attribution(cases, args.split, args.seeds)
+        sys.stdout.write(format_attribution(attribution) + "\n")
+        return 0
     if args.command == "stage6":
         cases = build_cases(seeds_for(args.split, args.seeds))
         stage6 = evaluate_stage6(cases, args.split, args.seeds, args.tamper_matches)
