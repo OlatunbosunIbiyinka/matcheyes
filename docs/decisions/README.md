@@ -18,6 +18,7 @@ records link to their replacement.
 | [0011](0011-evidence-audit-and-verification-hardening.md) | Evidence audit and verification hardening (provenance replay, entailment, independent auditor and lineage, blinded LLM evaluation with simulated fallback) | Accepted |
 | [0012](0012-personalization-presentation-layer.md) | Personalization is a derived presentation layer over verified insights (source held by reference and fingerprinted, deterministic policy, audit before and after, preferences relevance-only, LLM excluded from relevance) | Accepted |
 | [0013](0013-snapshot-anchored-insight-lifecycle.md) | Snapshot-anchored insight lifecycle (idempotent event log with contiguous watermark, one canonical snapshot per closed minute, fresh evaluation per snapshot, deterministic storyline identity, append-only chained revisions, independent lifecycle audit; corrections deferred) | Accepted |
+| [0014](0014-broadcast-cue-contract-and-live-presentation-surface.md) | Broadcast cue contract and live presentation surface (content-addressed cues compiled from the lifecycle record, moments at the next snapshot close, explicit retractions, deterministic selection, one server-owned replay per match over stdlib SSE, read-only API, CSP static surface; truth pipeline unchanged) | Accepted |
 
 ## Planned (decided at the stage where evidence exists)
 

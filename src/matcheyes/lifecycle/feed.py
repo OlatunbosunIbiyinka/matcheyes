@@ -24,6 +24,7 @@ from typing import Self
 
 from pydantic import Field, model_validator
 
+from matcheyes.agents.contracts import FinalInsight
 from matcheyes.agents.tools import MatchWorkspace
 from matcheyes.domain.base import DomainModel
 from matcheyes.domain.entities import Identifier
@@ -97,6 +98,34 @@ def _through(as_of: MatchInstant) -> str:
     return f"as of {end.display_minute}"
 
 
+def explanation_changes(old: FinalInsight, new: FinalInsight) -> list[str]:
+    """What `explanation_changed` recorded, field by field: the leading explanation only when it
+    differs, and each alternative whose assessment differs. Nothing unchanged is named."""
+    parts = []
+    if old.leading != new.leading:
+        before = old.leading.value if old.leading else "none"
+        after = new.leading.value if new.leading else "none"
+        parts.append(f"leading explanation {before} -> {after}")
+    if old.alternatives != new.alternatives:
+        before_alt, after_alt = dict(old.alternatives), dict(new.alternatives)
+        kinds = [k for k, _ in old.alternatives]
+        kinds += [k for k, _ in new.alternatives if k not in before_alt]
+        changed = []
+        for kind in kinds:
+            if kind not in after_alt:
+                changed.append(f"{kind.value} no longer listed")
+            elif kind not in before_alt:
+                changed.append(f"{kind.value} now listed ({after_alt[kind].value})")
+            elif before_alt[kind] is not after_alt[kind]:
+                changed.append(f"{kind.value} {before_alt[kind].value} -> {after_alt[kind].value}")
+        parts.append(
+            f"alternative explanations: {', '.join(changed)}"
+            if changed
+            else "alternative explanations reordered"
+        )
+    return parts
+
+
 def notice_text(state: LifecycleState, revision: Revision) -> str:
     """A factual, templated description of a lifecycle change. It names what changed in the
     verified record; it never explains why."""
@@ -127,9 +156,7 @@ def notice_text(state: LifecycleState, revision: Revision) -> str:
     if ChangeKind.STRENGTH_CHANGED in revision.change_kinds:
         parts.append(f"strength {old.strength.value} -> {final.strength.value}")
     if ChangeKind.EXPLANATION_CHANGED in revision.change_kinds:
-        before = old.leading.value if old.leading else "none"
-        after = final.leading.value if final.leading else "none"
-        parts.append(f"leading explanation {before} -> {after}")
+        parts += explanation_changes(old, final)
     if ChangeKind.INTEGRITY_CHANGED in revision.change_kinds:
         parts.append(
             f"evidence integrity {old.evidence_integrity.value} -> {final.evidence_integrity.value}"

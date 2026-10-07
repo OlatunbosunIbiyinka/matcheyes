@@ -1,8 +1,9 @@
 # Architecture
 
 Status: **deterministic engine (Stages 0–3), agentic investigation (Stage 4), evidence audit
-(Stage 5), deterministic personalization (Stage 6) and a snapshot-anchored insight lifecycle
-(Stage 7)**. Azure and web choices remain open.
+(Stage 5), deterministic personalization (Stage 6), a snapshot-anchored insight lifecycle
+(Stage 7) and a broadcast cue contract with a live, read-only presentation surface (Stage 8)**.
+Azure choices remain open.
 
 ## Principle
 
@@ -16,7 +17,7 @@ may and may not do.
 | AI REASONING | `agents` (investigator, challenger) | Chooses explanations and evidence requests; assesses. Structured output only. May not invent facts. |
 | EVIDENCE | `analytics` (objects), `agents` (typed tools, deterministic verifier) | Every claim links to tool facts and source events; the verifier can only keep or downgrade. |
 | NARRATIVE | `agents/narrative.py` (templated code) | Renders *verified* findings; labels fact vs interpretation. |
-| PRESENTATION | `personalization`, `api`, `web` | Personalizes emphasis, order, depth and wording of *verified, audited* insights; never the underlying facts, strength, evidence or integrity. |
+| PRESENTATION | `personalization`, `broadcast`, `api` (incl. its static web surface) | Personalizes emphasis, order, depth and wording of *verified, audited* insights, and times them on a broadcast surface; never the underlying facts, strength, evidence or integrity. |
 
 ## Dependency rules
 
@@ -27,12 +28,13 @@ domain, analytics  <-  agents
 domain, ingestion, analytics, agents  <-  orchestration
 domain, analytics, agents, orchestration  <-  personalization
 domain, ingestion, analytics, agents, orchestration, personalization  <-  lifecycle
-lifecycle, personalization, orchestration (and below)  <-  api
+lifecycle, personalization, orchestration (and below)  <-  broadcast
+broadcast, lifecycle, personalization, orchestration (and below)  <-  api
 ```
 
 `orchestration` and the layers below it must not import `personalization`: presentation sits
-downstream of verified truth and cannot feed back into it. Nothing but `api` (and the CLI) may
-import `lifecycle`.
+downstream of verified truth and cannot feed back into it. Nothing but `broadcast`, `api` (and
+the CLI) may import `lifecycle`; nothing but `api` (and the CLI) may import `broadcast`.
 
 `domain`, `ingestion` and `analytics` must not import any AI or cloud SDK. These rules are
 enforced by `tests/architecture/test_layer_boundaries.py` and run in CI.
@@ -121,6 +123,30 @@ and re-checks every revision against its own snapshot. The method is in
 [ADR-0013](decisions/0013-snapshot-anchored-insight-lifecycle.md) and the results in
 [stage7-evaluation.md](stage7-evaluation.md).
 
+## Broadcast cues and the live surface (Stage 8)
+
+`matcheyes.broadcast` compiles the lifecycle record and the observable events into one cue
+timeline per surface (fan or broadcaster, with or without a favourite club). `matcheyes.api`
+replays it live:
+
+```
+lifecycle state + event log ─► CueCompiler, per closed snapshot:
+    moments (Stage 3 key-event facts + period markers) ─► moment cues at the snapshot close
+    current revisions ─► Stage 6 primary feed of that snapshot ─► insight / revision cues
+    no longer current, off the primary feed, or snapshot unavailable ─► retraction cues
+    status changes ─► status cues
+  ─► CueTimeline (content-addressed, ordered by match time)
+LiveMatch (one per match, server-owned): replay clock ─► LifecycleEngine ─► 6 compilers
+  ─► published cues ─► GET /matches/{id}/timeline, GET /matches/{id}/stream (SSE) ─► static page
+```
+
+Broadcast presents; it decides no truth. Cue text is the Stage 6 view, the lifecycle's notice,
+a Stage 3 fact or a fixed template, and every cue names its source. The API is read-only,
+allow-listed and standard-library only; the page renders cue sections under a strict CSP and
+performs no football reasoning. The decision is in
+[ADR-0014](decisions/0014-broadcast-cue-contract-and-live-presentation-surface.md) and the
+results in [stage8-evaluation.md](stage8-evaluation.md).
+
 ## Observable world vs hidden world
 
 ```
@@ -147,8 +173,9 @@ EVENT -> DETECT -> INVESTIGATE -> VERIFY -> EXPLAIN -> PERSONALIZE
 | EXPLAIN | templated | narrative from verified findings only |
 | PERSONALIZE | deterministic, templated | Fan / Broadcaster / Analyst views of audited insights; preferences affect relevance only (Stage 6) |
 | LIFECYCLE | deterministic | per closed minute: snapshot, re-run the pipeline, reconcile storylines, append revisions (Stage 7) |
+| BROADCAST | deterministic | per closed minute: moment, insight, revision, retraction and status cues; served live over SSE (Stage 8) |
 
-## Real-time and insight lifecycle (Stage 7; infrastructure in Stage 8)
+## Real-time and insight lifecycle (Stage 7; live replay in Stage 8; infrastructure later)
 
 Stage 7 implements the lifecycle semantics as local, deterministic recomputation
 ([ADR-0013](decisions/0013-snapshot-anchored-insight-lifecycle.md)):
@@ -160,11 +187,13 @@ Stage 7 implements the lifecycle semantics as local, deterministic recomputation
 * latency is bounded below by detection: at least about 15 match minutes after an onset (median
   18–22 minutes from the planted window start in the evaluation).
 
-It is not production real-time streaming. Transport, storage, retries across processes and
-correlation IDs belong to the Stage 8 infrastructure decisions. Corrections to already-accepted
-events are rejected, not applied.
+It is not production real-time streaming. Stage 8 replays the lifecycle live from a single,
+in-memory process over Server-Sent Events on a deterministic replay clock
+([ADR-0014](decisions/0014-broadcast-cue-contract-and-live-presentation-surface.md)). Transport,
+storage, retries across processes and correlation IDs remain later infrastructure decisions.
+Corrections to already-accepted events are rejected, not applied.
 
-## Azure (to be decided in Stage 8)
+## Azure (deferred from Stage 8)
 
 Candidate services are evaluated by "what problem does this solve?", not by availability.
 Microsoft Foundry (models, tracing, evaluation) is the expected model platform; the Stage 4 LLM

@@ -1,0 +1,43 @@
+body { font-family: system-ui, sans-serif; margin: 0; background: #0f1720; color: #e6edf3; }
+header { display: flex; justify-content: space-between; align-items: center; gap: 1rem;
+  padding: 0.8rem 1.2rem; background: #16212c; flex-wrap: wrap; }
+h1 { margin: 0; font-size: 1.4rem; }
+h2 { font-size: 1rem; margin: 0 0 0.6rem; color: #9fb3c8; }
+.tag { margin: 0.2rem 0 0; color: #9fb3c8; font-size: 0.85rem; }
+form { display: flex; gap: 0.8rem; flex-wrap: wrap; }
+label { font-size: 0.85rem; color: #9fb3c8; }
+select { margin-left: 0.3rem; }
+#scoreboard { display: flex; align-items: center; gap: 1rem; padding: 0.8rem 1.2rem;
+  background: #1c2a38; font-size: 1.2rem; flex-wrap: wrap; }
+.score { font-weight: 700; font-size: 1.6rem; }
+.clock { font-variant-numeric: tabular-nums; color: #ffd166; }
+.status { font-size: 0.85rem; padding: 0.2rem 0.6rem; border-radius: 1rem; background: #2b3b4d; }
+.status.unavailable, .status.data_incomplete { background: #7a2e2e; }
+main { display: grid; grid-template-columns: 2fr 1fr; gap: 1rem; padding: 1rem 1.2rem; }
+section, aside { min-width: 0; }
+body > section:not(#scoreboard) { padding: 0 1.2rem 1rem; }
+.card { background: #1c2a38; border-left: 4px solid #3fb950; border-radius: 6px;
+  padding: 0.7rem 0.9rem; margin-bottom: 0.8rem; }
+.card.tentative { border-left-color: #d29922; }
+.card.natural_variation { border-left-color: #8b949e; }
+.card.compromised { border-left-color: #f85149; }
+.card.retracted { opacity: 0.6; border-left-color: #f85149; }
+.card.retracted .sections { text-decoration: line-through; }
+.card.flash { outline: 2px solid #ffd166; }
+.badge { display: inline-block; font-size: 0.75rem; padding: 0.1rem 0.5rem; border-radius: 1rem;
+  background: #2b3b4d; margin-right: 0.4rem; }
+.badge.retracted { background: #7a2e2e; }
+.section { margin: 0.3rem 0; line-height: 1.35; }
+.section.fact { font-weight: 600; }
+.section.notice, .section.retraction { color: #ffd166; }
+.section.integrity { color: #f85149; }
+.section.glossary, .section.caveat, .section.context { color: #9fb3c8; font-size: 0.9rem; }
+.empty { color: #9fb3c8; }
+.moments, .log { list-style: none; padding: 0; margin: 0; }
+.moments li, .log li { background: #16212c; border-radius: 6px; padding: 0.5rem 0.7rem;
+  margin-bottom: 0.5rem; font-size: 0.9rem; }
+.moments li.live { outline: 2px solid #ffd166; }
+.moments .head { font-weight: 700; margin-right: 0.4rem; }
+.when { color: #9fb3c8; font-size: 0.8rem; margin-right: 0.4rem; }
+footer { padding: 1rem 1.2rem; color: #6e7f91; font-size: 0.8rem; }
+@media (max-width: 800px) { main { grid-template-columns: 1fr; } }

@@ -1,18 +1,19 @@
 """The lifecycle feed and its Stage 6 bridge: current truth only, history kept, stale views
 flagged."""
 
+import re
 from functools import cache
 
 import pytest
 from pydantic import ValidationError
 
-from matcheyes.agents.contracts import EvidenceIntegrity
+from matcheyes.agents.contracts import EvidenceIntegrity, HypothesisKind, Status
 from matcheyes.agents.tools import MatchWorkspace
 from matcheyes.domain.claims import ClaimStrength
 from matcheyes.ingestion.log import DataStatus, LogStatus
 from matcheyes.lifecycle.contracts import MATERIAL, ChangeKind, LifecycleState, StorylineState
 from matcheyes.lifecycle.engine import replay
-from matcheyes.lifecycle.evaluate import SnapshotEvaluation
+from matcheyes.lifecycle.evaluate import InsightOutcome, SnapshotEvaluation
 from matcheyes.lifecycle.feed import (
     CurrentStatus,
     LifecycleFeed,
@@ -111,6 +112,65 @@ def test_evidence_only_changes_are_history_not_notices() -> None:
     r = state.storylines[0].revisions[-1]
     assert r.change_kinds == (ChangeKind.EVIDENCE_CHANGED,)
     assert lifecycle_feed(state, _status(state, 20)).notices == ()
+
+
+TAUTOLOGY = re.compile(r"(?<![\w-])([\w'+-]+) -> \1(?![\w-])")
+
+
+def _with_alternatives(
+    a: InsightOutcome, alternatives: tuple[tuple[HypothesisKind, Status], ...]
+) -> InsightOutcome:
+    return a.model_copy(update={"final": a.final.model_copy(update={"alternatives": alternatives})})
+
+
+def test_an_alternatives_only_change_names_the_alternative_not_the_leading_explanation() -> None:
+    a = insights()[0]
+    kind = next(k for k in HypothesisKind if k is not a.final.leading)
+    before = _with_alternatives(a, ((kind, Status.INSUFFICIENT_EVIDENCE),))
+    after = _with_alternatives(a, ((kind, Status.CONTRADICTED),))
+    state = _scripted(evaluated(10, before), evaluated(20, after))
+    r = state.storylines[0].revisions[-1]
+    assert ChangeKind.EXPLANATION_CHANGED in r.change_kinds
+    text = notice_text(state, r)
+    assert "leading explanation" not in text
+    assert f"alternative explanations: {kind.value} insufficient_evidence -> contradicted" in text
+    assert TAUTOLOGY.search(text) is None, text
+
+
+def test_alternatives_added_removed_or_reordered_are_described_truthfully() -> None:
+    a = insights()[0]
+    k1, k2 = [k for k in HypothesisKind if k is not a.final.leading][:2]
+    one = _with_alternatives(a, ((k1, Status.SUPPORTED),))
+    two = _with_alternatives(a, ((k2, Status.CONTRADICTED),))
+    state = _scripted(evaluated(10, one), evaluated(20, two))
+    text = notice_text(state, state.storylines[0].revisions[-1])
+    assert f"{k1.value} no longer listed" in text
+    assert f"{k2.value} now listed (contradicted)" in text
+    both = _with_alternatives(a, ((k1, Status.SUPPORTED), (k2, Status.CONTRADICTED)))
+    swapped = _with_alternatives(a, ((k2, Status.CONTRADICTED), (k1, Status.SUPPORTED)))
+    state = _scripted(evaluated(10, both), evaluated(20, swapped))
+    text = notice_text(state, state.storylines[0].revisions[-1])
+    assert "alternative explanations reordered" in text and TAUTOLOGY.search(text) is None
+
+
+def test_a_leading_explanation_change_is_still_named() -> None:
+    a = insights()[0]
+    k1, k2 = [k for k in HypothesisKind if k is not a.final.leading][:2]
+    first = a.model_copy(update={"final": a.final.model_copy(update={"leading": k1})})
+    second = a.model_copy(update={"final": a.final.model_copy(update={"leading": k2})})
+    state = _scripted(evaluated(10, first), evaluated(20, second))
+    text = notice_text(state, state.storylines[0].revisions[-1])
+    assert f"leading explanation {k1.value} -> {k2.value}" in text
+    assert "alternative explanations" not in text
+
+
+def test_no_notice_in_the_reference_runs_names_an_unchanged_value() -> None:
+    for state in (reference().state, tampered()):
+        for s in state.storylines:
+            for r in s.revisions:
+                if MATERIAL & set(r.change_kinds):
+                    text = notice_text(state, r)
+                    assert TAUTOLOGY.search(text) is None, text
 
 
 def test_every_notice_is_factual_and_never_causal() -> None:

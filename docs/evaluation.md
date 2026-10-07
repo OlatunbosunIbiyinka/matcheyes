@@ -1,8 +1,8 @@
 # Evaluation
 
 Status: **deterministic evidence evaluation (Stages 2–3), investigation evaluation (Stage 4),
-verification hardening (Stage 5), personalization (Stage 6) and the insight lifecycle
-(Stage 7)**. "It looked good in the demo"
+verification hardening (Stage 5), personalization (Stage 6), the insight lifecycle
+(Stage 7) and the broadcast cue surface (Stage 8)**. "It looked good in the demo"
 is not evidence.
 
 | Layer | Method | Introduced |
@@ -16,6 +16,7 @@ is not evidence.
 | Verification hardening | Evidence lineage; independent claim and narrative audit; three-layer red team (assessment, evidence tampering, insight tampering); false-rejection and valid-case tests; audited decoys; blinded LLM-path harness with repeatability and ablation ([report](stage5-evaluation.md)) | Stage 5 |
 | Personalization | Construction invariants and an independent view audit on every view; same mandatory core across Fan / Broadcaster / Analyst; preference safety; feed placement; presentation red team (English only; no user study) ([report](stage6-evaluation.md)) | Stage 6 |
 | Insight lifecycle | Replay under reorder, shuffle, duplicates, conflicts, gaps, late fill, failure and tampering; byte-identical determinism; independent lifecycle audit with reproduction; lifecycle red team; storylines against planted truth ([report](stage7-evaluation.md)) | Stage 7 |
+| Broadcast surface | Cue traceability to the lifecycle and Stage 6 feed; retraction completeness; stale-card and stale-status minutes; moment coverage and delay; notice tautologies; card limit; order independence; failure behaviour; hidden-truth leaks; live replay and SSE equal to the offline compile; HTTP and static-surface security tests; performance ([report](stage8-evaluation.md)) | Stage 8 |
 | Narrative quality | Rubric-based evaluation (Foundry evaluators where verified) | Stages 5–10 |
 
 ## Planted-truth metrics
@@ -157,6 +158,31 @@ failed snapshot, tampered evidence and injected lifecycle faults. No targets wer
 
 The latency is set by detection (confirmation after an onset), not by transport. Stage 7 is
 deterministic local recomputation, not production streaming.
+
+## Stage 8 objectives and results
+
+Stage 8 is judged on the cue timelines of six surfaces per match and on the live server
+([stage8-evaluation.md](stage8-evaluation.md)): every cue is checked against the lifecycle state
+after its snapshot, the raw events and the Stage 6 views, and the on-screen state is re-derived
+from the cue contract alone. No targets were set. Held-out, 1 seed per scenario, 17 matches,
+102 surfaces, 1,696 snapshots:
+
+| Objective | Held-out |
+| --- | --- |
+| Cues traceable to the lifecycle, Stage 6 view, events or fixed templates | 2,630/2,630 |
+| Card superseded on the snapshot it stops being current; correct reason | 430/430; 88/88 |
+| Stale card-minutes / stale status-minutes | 0 / 0 |
+| Moments shown exactly once, within one snapshot (median / max delay) | 256/256 (36.3 s / 60 s) |
+| First cue / first insight card / first current lifecycle revision (median minute) | 1 / 47 / 30 |
+| Notices naming an unchanged value (pre-fix template on the same revisions) | 0 of 439 (58) |
+| At most three cards; re-anchor and evidence-only revisions silent | 10,176/10,176; 342/342 |
+| Offline equals live: server replay, timeline endpoint, SSE byte for byte (2 matches) | 12/12 each |
+| Shuffled delivery gives the canonical timeline | 17/17 |
+| Injected failure: every card retracted, status unavailable | 17/17 |
+| Hidden-truth tokens in timelines and HTTP responses | 0 |
+
+Stage 8 is a deterministic replay over SSE from one local process, not hosted real-time
+broadcasting.
 
 ## Test categories
 

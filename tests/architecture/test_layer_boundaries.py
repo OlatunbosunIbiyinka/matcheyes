@@ -22,6 +22,15 @@ ALLOWED_INTERNAL_DEPENDENCIES: dict[str, set[str]] = {
         "orchestration",
         "personalization",
     },
+    "broadcast": {
+        "domain",
+        "ingestion",
+        "analytics",
+        "agents",
+        "orchestration",
+        "personalization",
+        "lifecycle",
+    },
     "api": {
         "domain",
         "ingestion",
@@ -30,6 +39,7 @@ ALLOWED_INTERNAL_DEPENDENCIES: dict[str, set[str]] = {
         "orchestration",
         "personalization",
         "lifecycle",
+        "broadcast",
     },
 }
 

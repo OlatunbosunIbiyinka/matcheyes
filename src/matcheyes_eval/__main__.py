@@ -8,6 +8,7 @@ python -m matcheyes_eval redteam --split development --seeds 5
 python -m matcheyes_eval stage6 --split development --seeds 2
 python -m matcheyes_eval stage7 --split development --seeds 1 [--matches N] [--fresh-replays N]
 python -m matcheyes_eval stage7-attribution --split development --seeds 1 [--matches N]
+python -m matcheyes_eval stage8 --split development --seeds 1 [--matches N] [--live-matches N]
 python -m matcheyes_eval llm --profile live            (needs MATCHEYES_LLM_* in the environment)
 python -m matcheyes_eval llm --profile overclaiming    (SIMULATED; not a language model)
 """
@@ -36,6 +37,7 @@ from matcheyes_eval.stage4 import evaluate_stage4, format_stage4
 from matcheyes_eval.stage6 import evaluate_stage6, format_stage6
 from matcheyes_eval.stage7 import evaluate_stage7, format_stage7
 from matcheyes_eval.stage7_attribution import evaluate_attribution, format_attribution
+from matcheyes_eval.stage8 import evaluate_stage8, format_stage8
 
 TUNING_GRID = [
     (z, w, b) for w, b in ((10, 10), (10, 20), (15, 15), (15, 30)) for z in (2.0, 2.5, 3.0)
@@ -80,6 +82,11 @@ def main(argv: list[str] | None = None) -> int:
     att.add_argument("--split", choices=["development", "held-out"], default="development")
     att.add_argument("--seeds", type=int, default=1)
     att.add_argument("--matches", type=int, default=None, help="Only the first N matches.")
+    cue = sub.add_parser("stage8", help="Stage 8 broadcast cues and the live surface.")
+    cue.add_argument("--split", choices=["development", "held-out"], default="development")
+    cue.add_argument("--seeds", type=int, default=1)
+    cue.add_argument("--matches", type=int, default=None, help="Only the first N matches.")
+    cue.add_argument("--live-matches", type=int, default=1, help="Server + HTTP checks.")
     llm = sub.add_parser("llm", help="Stage 5 LLM-path evaluation (live or SIMULATED profile).")
     llm.add_argument("--profile", choices=["live", *PROFILES], default="live")
     llm.add_argument("--split", choices=["development", "held-out"], default="development")
@@ -100,6 +107,11 @@ def main(argv: list[str] | None = None) -> int:
         cases = build_cases(seeds_for(args.split, args.seeds))[: args.matches]
         stage7 = evaluate_stage7(cases, args.split, args.seeds, args.fresh_replays)
         sys.stdout.write(format_stage7(stage7) + "\n")
+        return 0
+    if args.command == "stage8":
+        cases = build_cases(seeds_for(args.split, args.seeds))[: args.matches]
+        stage8 = evaluate_stage8(cases, args.split, args.seeds, args.live_matches)
+        sys.stdout.write(format_stage8(stage8) + "\n")
         return 0
     if args.command == "stage7-attribution":
         cases = build_cases(seeds_for(args.split, args.seeds))[: args.matches]

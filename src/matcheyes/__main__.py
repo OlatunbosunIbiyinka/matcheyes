@@ -11,6 +11,11 @@ python -m matcheyes replay <match_dir>      Stage 7 lifecycle: replay the event 
                                             snapshot (one per closed minute) into storylines
     [--json PATH]                           also write the canonical lifecycle state
     [--audience ...] [--club ...] ...       Stage 6 view of the current revisions
+python -m matcheyes cues <match_dir>        Stage 8 broadcast cue timeline (offline compile)
+    [--audience fan|broadcaster] [--club ID] [--json PATH]
+python -m matcheyes serve <root>            Stage 8 live surface: read-only HTTP + SSE replay of
+                                            one match dir, or a dir of them (observable only)
+    [--host 127.0.0.1] [--port 8000] [--speed 20] [--no-loop]
 """
 
 import argparse
@@ -27,6 +32,10 @@ from matcheyes.agents.tools import MatchWorkspace
 from matcheyes.analytics.analysis import MatchAnalysis, analyse_match
 from matcheyes.analytics.contextual import ContextualAnalysis, analyse_contextual
 from matcheyes.analytics.moments import Names
+from matcheyes.api.catalog import load_catalog
+from matcheyes.api.server import BroadcastApp, BroadcastServer
+from matcheyes.broadcast.compiler import compile_timeline
+from matcheyes.broadcast.contracts import BROADCAST_AUDIENCES, CueTimeline
 from matcheyes.ingestion.io import load_observable_match
 from matcheyes.lifecycle.engine import replay
 from matcheyes.lifecycle.feed import LifecycleFeed, audience_feed, lifecycle_feed
@@ -150,6 +159,65 @@ def _replay(args: argparse.Namespace, profile: PersonalizationProfile | None) ->
     return 0
 
 
+def format_cues(timeline: CueTimeline) -> str:
+    lines = [
+        f"Cue timeline {timeline.timeline_id} - {timeline.match_id} "
+        f"({timeline.profile.audience.value}; {len(timeline.cues)} cues, "
+        f"{timeline.snapshots} snapshots)",
+    ]
+    for cue in timeline.cues:
+        head = cue.sections[0].text if cue.sections else ""
+        lines.append(
+            f"  {cue.show_from.display_minute:>6} {cue.kind.value:<10} p{cue.priority:<3} "
+            f"{cue.cue_id} {head}"
+        )
+    return "\n".join(lines)
+
+
+def _cues(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
+    match = load_observable_match(args.match_dir)
+    try:
+        profile = PersonalizationProfile(audience=args.audience, favourite_club_id=args.club)
+    except ValidationError:
+        parser.error("invalid preference: club")
+    if args.club not in (None, match.info.home.team_id, match.info.away.team_id):
+        parser.error("--club must be one of the two clubs")
+    engine = replay(match.info, match.events)
+    timeline = compile_timeline(
+        match.info, engine.log.events(), engine.state, profile, engine.status().data_status
+    )
+    if args.json:
+        args.json.write_text(timeline.model_dump_json(indent=2) + "\n", "utf-8", newline="\n")
+    sys.stdout.write(format_cues(timeline) + "\n")
+    return 0
+
+
+def _serve(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
+    if not 0 <= args.speed <= 600:
+        parser.error("--speed must be between 0 and 600")
+    if not 0 <= args.port <= 65535:
+        parser.error("--port must be between 0 and 65535")
+    try:
+        catalog = load_catalog(args.root)
+    except (OSError, ValueError) as error:
+        parser.error(f"cannot load matches: {error}")
+    app = BroadcastApp(catalog, args.speed, loop=not args.no_loop)
+    server = BroadcastServer((args.host, args.port), app)
+    host, port = server.server_address[:2]
+    sys.stdout.write(
+        f"MatchEyes broadcast surface on http://{host!s}:{port} - {len(catalog)} match(es), "
+        f"speed x{args.speed:g}. Ctrl+C to stop.\n"
+    )
+    sys.stdout.flush()
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        server.server_close()
+    return 0
+
+
 def _model(use_llm: bool) -> ReasoningModel | None:
     if not use_llm:
         return RuleBasedReasoner()
@@ -206,6 +274,21 @@ def main(argv: list[str] | None = None) -> int:
     lifecycle.add_argument("--club", help="Favourite club ID (needs --audience).")
     lifecycle.add_argument("--player", help="Favourite player ID (needs --audience).")
     lifecycle.add_argument("--metric", help="Favourite metric name (needs --audience).")
+    cues = sub.add_parser("cues", help="Compile the broadcast cue timeline of a match.")
+    cues.add_argument("match_dir", type=Path)
+    cues.add_argument(
+        "--audience",
+        choices=sorted(a.value for a in BROADCAST_AUDIENCES),
+        default=Audience.FAN.value,
+    )
+    cues.add_argument("--club", help="Favourite club ID.")
+    cues.add_argument("--json", type=Path, help="Also write the cue timeline as JSON.")
+    serve = sub.add_parser("serve", help="Serve the live broadcast surface (read-only).")
+    serve.add_argument("root", type=Path, help="An observable match dir, or a dir of them.")
+    serve.add_argument("--host", default="127.0.0.1")
+    serve.add_argument("--port", type=int, default=8000)
+    serve.add_argument("--speed", type=float, default=20.0, help="Match seconds per second.")
+    serve.add_argument("--no-loop", action="store_true", help="Replay once, then stay idle.")
     args = parser.parse_args(argv)
 
     if args.command is None:
@@ -213,6 +296,10 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "replay":
         return _replay(args, _profile(parser, args))
+    if args.command == "cues":
+        return _cues(parser, args)
+    if args.command == "serve":
+        return _serve(parser, args)
     profile = _profile(parser, args) if args.command == "investigate" else None
     match = load_observable_match(args.match_dir)
     if args.command == "investigate":

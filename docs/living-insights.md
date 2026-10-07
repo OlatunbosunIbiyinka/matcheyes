@@ -194,7 +194,9 @@ insight. Snapshots that are INVALID or FAILED are recorded but change no storyli
   are never silently dropped;
 * **notices**: material changes on the latest snapshot, as factual templated text, for example
   "Revised as of <minute>: verdict tentative -> explained." Evidence-only changes are history,
-  not notices.
+  not notices. When only the alternatives changed, the notice names the alternatives instead of
+  repeating an unchanged leading explanation ("none -> none"); see
+  [ADR-0014](decisions/0014-broadcast-cue-contract-and-live-presentation-surface.md).
 
 | Status | Meaning |
 | --- | --- |

@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MatchEyes - live broadcast surface</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <header>
+    <div>
+      <h1>MatchEyes</h1>
+      <p class="tag">Synthetic, fictional match. Deterministic replay of verified, living insights.</p>
+    </div>
+    <form id="controls">
+      <label>Match <select id="match"></select></label>
+      <label>Audience
+        <select id="audience">
+          <option value="fan">Fan</option>
+          <option value="broadcaster">Broadcaster</option>
+        </select>
+      </label>
+      <label>Favourite club <select id="club"><option value="">None</option></select></label>
+    </form>
+  </header>
+
+  <section id="scoreboard" aria-live="polite">
+    <span id="home" class="team"></span>
+    <span id="score" class="score">0-0</span>
+    <span id="away" class="team"></span>
+    <span id="clock" class="clock">-</span>
+    <span id="status" class="status">Connecting...</span>
+  </section>
+
+  <main>
+    <section id="insights" aria-live="polite">
+      <h2>Live insights</h2>
+      <p id="empty" class="empty">No verified insight available.</p>
+      <div id="cards"></div>
+    </section>
+    <aside>
+      <h2>Key moments</h2>
+      <ol id="moments" class="moments"></ol>
+    </aside>
+  </main>
+
+  <section>
+    <h2>Revisions and retractions</h2>
+    <ol id="log" class="log"></ol>
+  </section>
+
+  <footer>
+    Every insight card is the Stage 6 verified view of a lifecycle revision, shown only while that
+    revision is current. Moments are factual match events. All text is shown exactly as the server
+    sent it; this page computes nothing about the match.
+  </footer>
+  <script src="/static/app.js"></script>
+</body>
+</html>

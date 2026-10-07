@@ -31,10 +31,11 @@ See [`docs/architecture.md`](docs/architecture.md).
 
 ## Status
 
-Built in explicit, reviewed stages. **Current: Stage 7 — Snapshot-anchored insight lifecycle:
-living insights that are re-derived on each closed match minute and versioned with an
-append-only history.** This is deterministic local recomputation, not production real-time
-streaming.
+Built in explicit, reviewed stages. **Current: Stage 8 — Broadcast cue contract and live match
+surface: the living insights of Stage 7, plus factual key moments, compiled into a timed,
+content-addressed cue stream and replayed to a minimal web surface over Server-Sent Events.**
+This is a deterministic replay of synthetic, fictional matches on one local process — not
+production real-time broadcasting, and no cloud hosting.
 
 | Stage | Scope | Status |
 | --- | --- | --- |
@@ -46,9 +47,9 @@ streaming.
 | 4 | Agentic investigation: competing explanations, typed tools, challenger, deterministic verifier and claim ladder; first claims above `associated` | Done |
 | 5 | Evidence audit and verification hardening: lineage, provenance replay, entailment, independent claim auditor, three-layer red team, blinded LLM evaluation harness (live LLM not yet evaluated) | Done |
 | 6 | Personalization (Fan / Broadcaster / Analyst): audience views and feeds over verified insights, preferences for relevance only, independent view audit, presentation red team (no user study yet) | Done |
-| 7 | Snapshot-anchored insight lifecycle: event log with contiguous watermark, one canonical snapshot per closed minute, storylines with append-only revisions, lifecycle audit, replay evaluation (no corrections, no streaming infrastructure) | In review |
-| 8 | Azure / cloud-native | Not started |
-| 9 | Production readiness | Not started |
+| 7 | Snapshot-anchored insight lifecycle: event log with contiguous watermark, one canonical snapshot per closed minute, storylines with append-only revisions, lifecycle audit, replay evaluation (no corrections, no streaming infrastructure) | Done |
+| 8 | Broadcast cue contract and live match surface: moment / insight / revision / retraction / status cues, deterministic selection, one server-owned replay per match, read-only stdlib HTTP + SSE, CSP static page (no Foundry, no Azure) | In review |
+| 9 | Production readiness (Azure / cloud-native hosting deferred from Stage 8) | Not started |
 | 10 | Product UX and hackathon polish | Not started |
 | 11 | Final submission | Not started |
 
@@ -75,6 +76,12 @@ uv run python -m matcheyes investigate data/fixtures/minimal_match --audience fa
 # Replay a match minute by minute: storylines, revisions and the lifecycle feed
 uv run python -m matcheyes replay data/fixtures/minimal_match --json lifecycle.json
 
+# The broadcast cue timeline of one surface (offline compile), and the live surface:
+# a read-only server on http://127.0.0.1:8000 replaying observable matches at x20 over SSE
+uv run python -m matcheyes cues data/fixtures/minimal_match --audience fan --json cues.json
+uv run python -m matcheyes_synth generate --scenario S05_red_card_reorganisation --out demo
+uv run python -m matcheyes serve demo/observable --speed 20
+
 # Synthetic matches (hidden-world tooling; never shipped with the engine)
 uv run python -m matcheyes_synth generate --scenario S02_press_surge   # default seed
 uv run python -m matcheyes_synth realism --split held-out --count 20
@@ -86,6 +93,7 @@ uv run python -m matcheyes_eval stage4 --split development --seeds 20 --fault-se
 uv run python -m matcheyes_eval redteam --split development --seeds 5
 uv run python -m matcheyes_eval stage6 --split development --seeds 2
 uv run python -m matcheyes_eval stage7 --split development --seeds 1
+uv run python -m matcheyes_eval stage8 --split development --seeds 1
 # LLM path: --profile live needs MATCHEYES_LLM_*; other profiles are SIMULATED, not a model
 uv run python -m matcheyes_eval llm --profile faithful --split held-out --seeds 2 --matches 7
 ```
@@ -103,7 +111,8 @@ src/matcheyes/
   orchestration/   WORKFLOW     explicit, bounded investigation flow and traces
   personalization/ PRESENTATION audience views and feeds of verified insights, view audit
   lifecycle/       WORKFLOW     snapshots, storylines, append-only revisions, lifecycle audit
-  api/             PRESENTATION HTTP boundary for the web app
+  broadcast/       PRESENTATION cue contract, moments, selection, cue timeline compiler
+  api/             PRESENTATION read-only HTTP + SSE, server-owned live replay, static web surface
 src/matcheyes_synth/  HIDDEN    fictional league, hidden state, scenarios, generator (never shipped)
 src/matcheyes_eval/   HIDDEN    scores engine output against the answer key (never shipped)
 tests/             unit, architecture-boundary and (later) evaluation tests
@@ -112,7 +121,8 @@ docs/              architecture, agent design, data model, evaluation, ADRs
 scripts/           local quality gate
 ```
 
-Infrastructure (`infra/`) and the web app (`web/`) come in later stages.
+The Stage 8 web surface is three static files in `src/matcheyes/api/static/`. Infrastructure
+(`infra/`) and a fuller web app come in later stages.
 
 ## Documentation
 
@@ -130,5 +140,6 @@ Infrastructure (`infra/`) and the web app (`web/`) come in later stages.
 - [Evidence audit](docs/evidence-audit.md) and [Stage 5 evaluation](docs/stage5-evaluation.md)
 - [Personalization](docs/personalization.md) and [Stage 6 evaluation](docs/stage6-evaluation.md)
 - [Living insights](docs/living-insights.md) and [Stage 7 evaluation](docs/stage7-evaluation.md)
+- [Broadcast cues and the live surface: Stage 8 evaluation](docs/stage8-evaluation.md)
 - [Development workflow](docs/development.md)
 - [Architecture decision records](docs/decisions/README.md)
