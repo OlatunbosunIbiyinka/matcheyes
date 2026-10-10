@@ -33,6 +33,10 @@
         <span id="away-short" class="team-short" aria-hidden="true"></span>
       </div>
     </div>
+    <div class="hero-events">
+      <ul id="home-events" class="team-events home" hidden></ul>
+      <ul id="away-events" class="team-events away" hidden></ul>
+    </div>
     <p id="score-text" class="sr-only">Score not yet available.</p>
     <div class="matchstate">
       <p class="minute"><span class="sr-only">Match minute </span><span id="clock">-</span></p>
@@ -68,13 +72,32 @@
     <section class="story" aria-labelledby="story-heading">
       <div class="section-head">
         <h2 id="story-heading" tabindex="-1">The Match Story</h2>
-        <p class="section-dek">What is changing the game, and why it matters.</p>
+        <p class="section-dek">Verified changes in how the match is being played, and what the
+          evidence supports.</p>
       </div>
+      <section id="briefing" class="briefing" aria-labelledby="briefing-heading">
+        <h3 id="briefing-heading">Match briefing</h3>
+        <div class="brief-row">
+          <h4>Key moments</h4>
+          <div>
+            <p id="brief-moments-empty" class="quiet">Waiting for the replay to start.</p>
+            <ol id="brief-moments" class="brief-moments"></ol>
+          </div>
+        </div>
+        <div class="brief-row">
+          <h4>Analysis now</h4>
+          <div>
+            <p id="brief-analysis-empty" class="quiet">No verified insight is showing.</p>
+            <ul id="brief-analysis" class="brief-analysis"></ul>
+          </div>
+        </div>
+      </section>
       <p id="feed-status" class="feed-status"></p>
       <div id="empty" class="empty">
-        <h3>No verified insight at the moment</h3>
-        <p>An insight appears here when MatchEyes detects a change in the match and the verifier
-          accepts how it is described. Factual match events appear in the timeline.</p>
+        <h3>No verified insight right now</h3>
+        <p>MatchEyes publishes an insight only when it detects a change in the match and the
+          verifier accepts how it is described. Goals, cards, substitutions and the half-time and
+          full-time whistles are in the match timeline.</p>
       </div>
       <div id="cards" class="story-items"></div>
     </section>
@@ -87,16 +110,18 @@
         <legend class="sr-only">Show</legend>
         <div class="options">
           <label><input type="radio" name="lane" value="moments" checked><span>Match events</span></label>
-          <label><input type="radio" name="lane" value="log"><span>Analysis log</span></label>
+          <label><input type="radio" name="lane" value="log"><span>Analysis updates</span></label>
         </div>
       </fieldset>
       <div id="lane-moments">
-        <p id="moments-empty" class="quiet">No match events yet.</p>
+        <p id="moments-note" class="quiet lane-note" hidden>Latest first. Open an event for the score at that point and the
+          analysis that was showing.</p>
+        <p id="moments-empty" class="quiet">No match events yet. They appear here from kick-off.</p>
         <ol id="moments" class="events"></ol>
       </div>
       <div id="lane-log" hidden>
-        <p class="quiet">Insights published, revised and retracted by MatchEyes. These are analysis,
-          not match events.</p>
+        <p class="quiet lane-note">Insights published, revised and retracted by MatchEyes. These are
+          analysis, not match events.</p>
         <p id="log-empty" class="quiet">No analysis updates yet.</p>
         <ol id="log" class="analysis"></ol>
       </div>
@@ -112,8 +137,8 @@
 
   <footer class="footer">
     <p>MatchEyes is a demonstration on fictional football data. Moments are factual match events;
-      insights are verified views, shown only while they are current. All text is shown exactly as
-      the server sent it; this page computes nothing about the match.</p>
+      insights are verified views, shown only while they are current. All match and insight text
+      comes from the server; this page computes nothing about the match.</p>
     <p>Not affiliated with, or endorsed by, any league, club or broadcaster.</p>
   </footer>
 

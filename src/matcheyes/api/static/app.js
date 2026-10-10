@@ -28,7 +28,22 @@ const MOMENT_CLASS = {
   period_start: "k-period",
   period_end: "k-period",
 };
-const SECTION_LABEL = { caveat: "Caveat", glossary: "Definition", integrity: "Integrity" };
+const KEY_MOMENT = { goal: "Goal", red_card: "Red card" };
+const SECTION_LABEL = {
+  trigger: "What happened",
+  interpretation: "Interpretation",
+  no_insight: "Interpretation",
+  caveat: "Limits",
+  involvement: "Player involvement",
+  glossary: "Definition",
+  integrity: "Evidence warning",
+};
+// The server appends the verifier's label to an explained view as "[verified, <strength>]" or
+// "[verified on remaining evidence, <strength>]", optionally followed by "(evidence <ids>)" on the
+// broadcaster view. When the text ends in exactly that shape it is shown as the card's
+// verification status instead of inside the prose; any other text is left as sent.
+const VERIFIED_SUFFIX =
+  /\s*\[(verified|verified on remaining evidence), ([a-z]+)\](?: \(evidence ([\w.:-]+(?:, [\w.:-]+)*)\))?$/;
 const PERIOD_LABEL = { 1: "First half", 2: "Second half" };
 const REPLAY_TEXT = {
   connecting: "Connecting",
@@ -41,6 +56,7 @@ const CATCH_UP_GAP_MS = 400;
 
 let source = null;
 let edition = null;
+let started = false;
 let ended = false;
 let replay = "connecting";
 let catchingUp = true; // messages that arrive in one burst after (re)connecting are history
@@ -51,6 +67,7 @@ let items = new Map(); // cue_id -> story item
 let expiring = []; // {expires: [period, ms], node, item, id}
 let now = [1, 0];
 let minutes = new Map(); // snapshot_id -> minute label from the clock ticks
+let eventsAt = new Map(); // snapshot_id -> event detail panels opened at that snapshot
 let minute = "";
 let period = 0;
 let phase = "";
@@ -94,6 +111,11 @@ function keepFocus(container) {
   if (container.contains(document.activeElement)) $("story-heading").focus();
 }
 
+function scoreText(score) {
+  if (!current) return score.home + DASH + score.away;
+  return current.home.short_name + " " + score.home + DASH + score.away + " " + current.away.short_name;
+}
+
 // --- replay and connection state --------------------------------------------------------------
 
 function setReplay(next, detail) {
@@ -106,6 +128,7 @@ function setReplay(next, detail) {
   banner.className = "connection c-" + next;
   $("connection-text").textContent = detail || "";
   $("retry").hidden = next !== "unavailable";
+  refreshEmpty();
 }
 
 function arrival() {
@@ -152,6 +175,19 @@ function teamShort(teamId) {
   return "";
 }
 
+function heroEvent(kind, teamId, at) {
+  if (!current) return;
+  const list = current.home.team_id === teamId ? $("home-events")
+    : current.away.team_id === teamId ? $("away-events") : null;
+  if (!list) return;
+  const li = el("li", "hero-event " + MOMENT_CLASS[kind]);
+  const mark = el("span", "mark");
+  mark.setAttribute("aria-hidden", "true");
+  li.append(mark, el("span", "sr-only", KEY_MOMENT[kind] + " "), el("span", null, at));
+  list.append(li);
+  list.hidden = false;
+}
+
 // --- Match Story ------------------------------------------------------------------------------
 
 function setFeedStatus(status, text) {
@@ -164,31 +200,73 @@ function refreshEmpty() {
   const showing = [...items.values()].some((item) => !item.retracted);
   $("empty").hidden = showing;
   $("moments-empty").hidden = $("moments").children.length > 0;
+  $("moments-note").hidden = !$("moments-empty").hidden;
   $("log-empty").hidden = $("log").children.length > 0;
+  $("brief-moments-empty").hidden = $("brief-moments").children.length > 0;
+  $("brief-moments-empty").textContent = started ? "No goals or red cards so far."
+    : replay === "unavailable" ? "Not available until the replay can be reached."
+      : "Waiting for the replay to start.";
+  $("brief-analysis-empty").hidden = $("brief-analysis").children.length > 0;
 }
 
-function sectionNode(s) {
-  const cls = s.kind === "interpretation" ? "standfirst" : "section s-" + s.kind;
-  const p = el("p", cls);
-  if (SECTION_LABEL[s.kind]) p.append(el("span", "section-label", SECTION_LABEL[s.kind]));
-  p.append(document.createTextNode(s.text));
-  return p;
+function jumpTo(item) {
+  if (!item.node.isConnected) return;
+  item.head.focus();
+  item.head.scrollIntoView({ block: "start" });
+  arrive(item.node);
+}
+
+function jumpButton(item, text) {
+  const button = el("button", "link-button", text);
+  button.type = "button";
+  button.addEventListener("click", () => jumpTo(item));
+  item.links.push(button);
+  return button;
+}
+
+function retireLinks(item) {
+  for (const button of item.links) {
+    keepFocus(button);
+    if (button.classList.contains("analysis-go")) {
+      button.remove();
+    } else {
+      button.disabled = true;
+      button.textContent += " (no longer shown)";
+    }
+  }
+  item.links = [];
+}
+
+function splitVerification(text) {
+  const match = VERIFIED_SUFFIX.exec(text);
+  if (!match) return { text, verified: "", strength: "", cited: "" };
+  return {
+    text: text.slice(0, match.index), verified: match[1], strength: match[2], cited: match[3] || "",
+  };
 }
 
 function makeItem() {
   const id = "item-" + ++uid;
   const node = el("article", "item");
   node.setAttribute("aria-labelledby", id + "-head");
-  const meta = el("p", "item-meta");
-  const label = el("span", "verdict");
-  const when = el("span", "item-when");
-  meta.append(label, when);
+  const top = el("div", "item-top");
+  const label = el("p", "verdict");
+  const check = el("p", "check");
+  check.hidden = true;
+  top.append(label, check);
+  const when = el("p", "item-when");
   const kicker = el("p", "item-kicker");
+  const eyebrow = el("p", "item-eyebrow", "What the data shows");
   const head = el("h3", "item-head");
   head.id = id + "-head";
-  const body = el("div", "item-body");
-  const notice = el("p", "item-notice");
+  head.tabIndex = -1;
+  const body = el("dl", "item-body");
+  const notice = el("div", "item-notice");
   notice.hidden = true;
+  const noticeText = el("p");
+  const toHistory = el("button", "link-button", "See the revision history");
+  toHistory.type = "button";
+  notice.append(noticeText, toHistory);
 
   const work = el("details", "disclosure work");
   const workPanel = el("div", "work-panel");
@@ -204,24 +282,32 @@ function makeItem() {
   stale.append(staleText, latest);
   const workRows = el("div", "work-rows");
   workPanel.append(workNote, workStatus, stale, workRows);
-  work.append(el("summary", null, "How this insight was checked"), workPanel);
+  work.append(el("summary", null, "Evidence and verification"), workPanel);
 
   const history = el("details", "disclosure history");
   const historySummary = el("summary", null, "Revision history");
   const historyList = el("ol", "history-list");
   history.append(historySummary, historyList);
 
-  node.append(meta, kicker, head, body, notice, work, history);
+  node.append(top, when, kicker, eyebrow, head, body, notice, work, history);
   const item = {
-    node, label, when, kicker, head, body, notice, work, workStatus, stale, staleText, workRows,
-    historySummary, historyList, storyline: "", revision: 0, verdict: "", published: "",
-    shown: 0, retracted: false,
+    node, label, check, when, kicker, head, body, notice, noticeText, work, workStatus, stale,
+    staleText, workRows, history, historySummary, historyList, storyline: "", revision: 0,
+    verdict: "", published: "", shown: 0, retracted: false, links: [], brief: null,
   };
   work.addEventListener("toggle", () => {
     if (work.open && item.shown !== item.revision) showWork(item);
   });
   latest.addEventListener("click", () => showWork(item));
+  toHistory.addEventListener("click", () => {
+    history.open = true;
+    historySummary.focus();
+  });
   return item;
+}
+
+function bodyRow(term, text, cls) {
+  return [el("dt", cls, term), el("dd", cls, text)];
 }
 
 function fillItem(item, cue, at) {
@@ -231,24 +317,55 @@ function fillItem(item, cue, at) {
   item.verdict = src.verdict;
   const compromised = src.evidence_integrity === "compromised";
   item.node.className = "item v-" + src.verdict + (compromised ? " compromised" : "") +
+    (item.retracted ? " retracted" : "") +
     (item.node.classList.contains("arrive") ? " arrive" : "");
-  item.label.textContent = (VERDICT_LABEL[src.verdict] || src.verdict) +
-    (compromised ? " \u00b7 Integrity warning" : "");
+  if (!item.retracted) {
+    item.label.textContent = (VERDICT_LABEL[src.verdict] || src.verdict) +
+      (compromised ? " \u00b7 Integrity warning" : "");
+  }
   item.when.textContent = item.published === at
     ? "Published " + at : "Published " + item.published + " \u00b7 updated " + at;
   let fact = "";
   let context = "";
+  let verified = "";
+  let strength = "";
+  let cited = "";
   const body = [];
   for (const s of cue.sections) {
     if (s.kind === "notice") continue; // revision notices are kept in the revision history
     if (s.kind === "fact" && !fact) fact = s.text;
     else if (s.kind === "context" && !context) context = s.text;
-    else body.push(sectionNode(s));
+    else if (s.kind === "interpretation") {
+      const split = splitVerification(s.text);
+      if (split.verified) {
+        verified = split.verified;
+        strength = split.strength;
+        cited = split.cited;
+      }
+      body.push(...bodyRow(SECTION_LABEL.interpretation, split.text, "b-interpretation"));
+    } else {
+      body.push(...bodyRow(SECTION_LABEL[s.kind] || "Note", s.text, "b-" + s.kind));
+    }
   }
   item.kicker.textContent = context;
   item.kicker.hidden = !context;
   item.head.textContent = fact || item.label.textContent;
   item.body.replaceChildren(...body);
+  item.body.hidden = body.length === 0;
+  item.check.hidden = !verified;
+  item.check.className = "check" + (verified === "verified" ? "" : " partial");
+  item.check.replaceChildren();
+  if (verified) {
+    const mark = el("span", "check-mark", "\u2713");
+    mark.setAttribute("aria-hidden", "true");
+    item.check.append(mark, el("span", null, verified[0].toUpperCase() + verified.slice(1)),
+      el("span", "check-strength", "Strength: " + strength));
+    if (cited) item.check.append(el("span", "check-strength", "Evidence cited: " + cited));
+  }
+  if (item.brief) {
+    item.brief.firstChild.textContent = item.label.textContent;
+    item.brief.lastChild.textContent = item.head.textContent;
+  }
   refreshStale(item);
 }
 
@@ -275,9 +392,11 @@ function renderRows(box, rows) {
   for (const row of rows) {
     if (row.section !== heading) {
       heading = row.section;
-      out.push(el("h4", null, heading));
+      const section = el("details", "work-section");
+      section.open = out.length === 0;
       group = el("dl", "work-group");
-      out.push(group);
+      section.append(el("summary", null, heading), group);
+      out.push(section);
     }
     group.append(el("dt", "tone-" + row.tone, row.label), el("dd", "tone-" + row.tone, row.text));
   }
@@ -305,51 +424,137 @@ async function showWork(item) {
   refreshStale(item);
 }
 
+function briefAdd(item) {
+  const li = el("li");
+  const button = jumpButton(item, item.head.textContent);
+  li.append(el("span", "brief-verdict", item.label.textContent), button);
+  item.brief = li;
+  $("brief-analysis").prepend(li);
+}
+
+function briefRemove(item) {
+  if (!item.brief) return;
+  keepFocus(item.brief);
+  item.brief.remove();
+  item.brief = null;
+}
+
 // --- timeline ----------------------------------------------------------------------------------
 
-function logEntry(type, cls, text, at) {
+function logEntry(type, cls, text, at, item) {
   const li = el("li", "analysis-entry " + cls);
   const body = el("div");
   body.append(el("span", "analysis-type", type), el("span", "analysis-text", text));
+  if (item && item.node.isConnected) {
+    const go = jumpButton(item, "View this insight");
+    go.classList.add("analysis-go");
+    body.append(go);
+  }
   li.append(el("span", "event-minute", at), body);
   $("log").prepend(li);
 }
 
-function onMoment(cue, at, live) {
-  const src = cue.source;
-  const li = el("li", "event " + (MOMENT_CLASS[src.moment] || "k-other") +
-    (cue.interrupt ? " key current" : ""));
-  const mark = el("span", "event-mark");
-  mark.setAttribute("aria-hidden", "true");
-  const body = el("div", "event-body");
+function contextFor(panel, at) {
+  const list = el("ul", "context-list");
+  panel.append(el("p", "context-head", "Analysis showing at " + at), list);
+  const none = el("p", "quiet", "No verified insight was showing at this point.");
+  panel.append(none, el("p", "context-note",
+    "Shown for context only. MatchEyes does not link this analysis to the event."));
+  return { list, none };
+}
+
+function addContext(context, item) {
+  const li = el("li");
+  li.append(jumpButton(item, item.head.textContent));
+  context.list.append(li);
+  context.none.hidden = true;
+}
+
+function onPeriod(cue, at, src) {
+  const li = el("li", "period-mark");
   let headline = "";
   let statement = "";
   for (const s of cue.sections) {
+    if (s.kind === "headline") headline = s.text;
+    else statement += (statement ? " " : "") + s.text;
+  }
+  const label = el("p", "period-label");
+  label.append(el("span", "period-name", headline));
+  if (src.moment === "period_end") label.append(el("span", "period-score", scoreText(src.score)));
+  if (statement) label.append(el("span", "sr-only", " " + statement));
+  li.append(el("span", "event-minute", at), label);
+  return li;
+}
+
+function onEvent(cue, at, src) {
+  const li = el("li", "event " + (MOMENT_CLASS[src.moment] || "k-other") +
+    (KEY_MOMENT[src.moment] ? " key" : "") + (cue.interrupt ? " current" : ""));
+  const details = el("details", "event-details");
+  const summary = el("summary", "event-summary");
+  const mark = el("span", "event-mark");
+  mark.setAttribute("aria-hidden", "true");
+  const body = el("span", "event-body");
+  for (const s of cue.sections) {
     if (s.kind === "headline") {
-      headline = s.text;
-      const head = el("p", "event-head");
+      const head = el("span", "event-head");
       head.append(el("span", null, s.text));
       const team = teamShort(src.team_id);
       if (team) head.append(el("span", "event-team", team));
       body.append(head);
     } else if (s.kind === "score") {
-      body.append(el("p", "event-score", s.text));
-      statement += " " + s.text;
+      body.append(el("span", "event-score", s.text));
     } else {
-      body.append(el("p", "event-text", s.text));
-      statement += " " + s.text;
+      body.append(el("span", "event-text", s.text));
     }
   }
-  li.append(el("span", "event-minute", at), mark, body);
+  summary.append(el("span", "event-minute", at), mark, body);
+  const panel = el("div", "event-more");
+  panel.append(el("p", "event-fact", "Score at this point: " + scoreText(src.score)));
+  const context = contextFor(panel, at);
+  for (const item of items.values()) if (!item.retracted) addContext(context, item);
+  const waiting = eventsAt.get(cue.snapshot_id) || [];
+  waiting.push(context);
+  eventsAt.set(cue.snapshot_id, waiting);
+  details.append(summary, panel);
+  li.append(details);
+  return li;
+}
+
+function briefMoment(cue, at, src) {
+  const li = el("li", "brief-moment " + MOMENT_CLASS[src.moment]);
+  const mark = el("span", "mark");
+  mark.setAttribute("aria-hidden", "true");
+  const head = el("span", "brief-head");
+  head.append(el("span", "brief-minute", at), el("span", null, KEY_MOMENT[src.moment]));
+  const team = teamShort(src.team_id);
+  if (team) head.append(el("span", "event-team", team));
+  const text = cue.sections.find((s) => s.kind === "moment");
+  li.append(mark, head);
+  if (text) li.append(el("span", "brief-text", text.text));
+  $("brief-moments").append(li);
+}
+
+function onMoment(cue, at, live) {
+  const src = cue.source;
+  const isPeriod = src.moment === "period_start" || src.moment === "period_end";
+  const li = isPeriod ? onPeriod(cue, at, src) : onEvent(cue, at, src);
   $("moments").prepend(li);
+  if (KEY_MOMENT[src.moment]) {
+    heroEvent(src.moment, src.team_id, at);
+    briefMoment(cue, at, src);
+  }
   setScore(src.score, live);
   if (src.moment === "period_end") phase = period >= 2 ? "Full time" : "Half-time";
   else if (src.moment === "period_start") phase = "";
   renderPhase();
-  expiring.push({ expires: key(cue.expires_at), node: li });
+  if (!isPeriod) expiring.push({ expires: key(cue.expires_at), node: li });
   if (live) {
     arrive(li);
-    if (cue.interrupt) announce(at + " " + headline + "." + statement);
+    if (cue.interrupt) {
+      const headline = cue.sections.find((s) => s.kind === "headline");
+      const rest = cue.sections.filter((s) => s.kind !== "headline").map((s) => s.text).join(" ");
+      announce(at + " " + (headline ? headline.text : "") + ". " + rest);
+    }
   }
 }
 
@@ -367,7 +572,9 @@ function onCue(cue) {
     addHistory(item, at, "Published.");
     items.set(cue.cue_id, item);
     $("cards").prepend(item.node);
-    logEntry("Insight published", "a-published", item.head.textContent, at);
+    briefAdd(item);
+    for (const context of eventsAt.get(cue.snapshot_id) || []) addContext(context, item);
+    logEntry("Insight published", "a-published", item.head.textContent, at, item);
     if (live) {
       arrive(item.node);
       announce("New insight, " + at + ": " + item.head.textContent);
@@ -383,8 +590,8 @@ function onCue(cue) {
       const notice = cue.sections.find((s) => s.kind === "notice");
       const text = notice ? notice.text : cue.sections[0].text;
       addHistory(item, at, text);
-      logEntry("Insight revised", "a-revised", text, at);
-      item.notice.textContent = "Revised " + at + ". See the revision history.";
+      logEntry("Insight revised", "a-revised", text, at, item);
+      item.noticeText.textContent = "Revised " + at + ".";
       item.notice.className = "item-notice";
       item.notice.hidden = false;
       if (live && previous !== item.verdict) {
@@ -396,19 +603,21 @@ function onCue(cue) {
     const item = items.get(cue.supersedes[0]);
     const reason = cue.sections[0].text;
     const fact = cue.sections[1] ? cue.sections[1].text : "";
-    logEntry("Insight retracted", "a-retracted", reason + (fact ? " " + fact : ""), at);
     if (live) announce("Insight retracted, " + at + ". " + reason);
-    if (!item) return;
-    item.retracted = true;
-    item.node.classList.add("retracted");
-    const why = RETRACTION_REASON[cue.source.reason];
-    item.label.textContent = RETRACTION_LABEL + (why ? " \u00b7 " + why : "");
-    item.notice.textContent = reason;
-    item.notice.className = "item-notice retraction";
-    item.notice.hidden = false;
-    addHistory(item, at, reason);
-    expiring.push({ expires: key(cue.expires_at), item, id: cue.supersedes[0] });
-    if (live) arrive(item.node);
+    if (item) {
+      item.retracted = true;
+      item.node.classList.add("retracted");
+      const why = RETRACTION_REASON[cue.source.reason];
+      item.label.textContent = RETRACTION_LABEL + (why ? " \u00b7 " + why : "");
+      item.noticeText.textContent = reason;
+      item.notice.className = "item-notice retraction";
+      item.notice.hidden = false;
+      addHistory(item, at, reason);
+      briefRemove(item);
+      expiring.push({ expires: key(cue.expires_at), item, id: cue.supersedes[0] });
+      if (live) arrive(item.node);
+    }
+    logEntry("Insight retracted", "a-retracted", reason + (fact ? " " + fact : ""), at, item);
   } else if (cue.kind === "status") {
     const text = cue.sections.map((s) => s.text).join(" ");
     setFeedStatus(cue.source.status, text);
@@ -432,6 +641,8 @@ function onClock(tick) {
     if (entry.item) {
       keepFocus(entry.item.node);
       entry.item.node.remove();
+      briefRemove(entry.item);
+      retireLinks(entry.item);
       items.delete(entry.id);
     } else {
       entry.node.classList.remove("current");
@@ -445,16 +656,27 @@ function onClock(tick) {
 
 function reset() {
   keepFocus($("cards"));
+  keepFocus($("briefing"));
+  keepFocus($("moments"));
+  keepFocus($("log"));
   items = new Map();
   expiring = [];
   now = [1, 0];
   minutes = new Map();
+  eventsAt = new Map();
   minute = "";
   period = 0;
   phase = "";
+  started = false;
   $("cards").replaceChildren();
   $("moments").replaceChildren();
   $("log").replaceChildren();
+  $("brief-moments").replaceChildren();
+  $("brief-analysis").replaceChildren();
+  for (const id of ["home-events", "away-events"]) {
+    $(id).replaceChildren();
+    $(id).hidden = true;
+  }
   clearScore();
   $("clock").textContent = DASH;
   renderPhase();
@@ -498,6 +720,8 @@ function connect() {
       }
     }
     edition = number;
+    started = true;
+    refreshEmpty();
   });
   stream.addEventListener("clock", (e) => {
     arrival();
@@ -561,7 +785,8 @@ function renderAbout(m) {
   fact(dl, "Transcript SHA-256", r.transcript_sha256);
   parts.push(dl);
   parts.push(el("p", null, "All text is shown exactly as the server sent it; this page computes " +
-    "nothing about the match."));
+    "nothing about the match. The verifier's label on each insight is shown as its verification " +
+    "status rather than inside the text."));
   $("about-body").replaceChildren(...parts);
 }
 
@@ -578,6 +803,8 @@ function selectMatch() {
   $("away-short").textContent = m.away.short_name;
   crest($("home-crest"), m.home);
   crest($("away-crest"), m.away);
+  $("home-events").setAttribute("aria-label", m.home.name + " goals and red cards");
+  $("away-events").setAttribute("aria-label", m.away.name + " goals and red cards");
   $("meta").textContent = m.competition + " \u00b7 Matchday " + m.matchday + " \u00b7 " + m.venue;
   $("match-title").textContent = m.home.name + " v " + m.away.name + ", replay";
   document.title = m.home.name + " v " + m.away.name + " \u00b7 MatchEyes";
