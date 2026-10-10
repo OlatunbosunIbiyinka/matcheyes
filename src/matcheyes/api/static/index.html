@@ -68,6 +68,43 @@
     <button id="retry" class="text-button" type="button" hidden>Try again</button>
   </div>
 
+  <section id="chart" class="chart" aria-labelledby="chart-heading">
+    <div class="chart-head">
+      <h2 id="chart-heading" tabindex="-1">Match at a glance</h2>
+      <p class="chart-note">Marks sit at snapshot time: the close of the match minute in which each
+        event was recorded, not the exact moment it happened. The analysis lane shows when insights
+        were published, revised or retracted; it is not linked to match events.</p>
+    </div>
+    <p id="chart-gap" class="chart-gap" hidden></p>
+    <div id="chart-frame" class="chart-frame">
+      <svg id="chart-svg" class="chart-svg" viewBox="0 0 1000 258" role="group"
+        aria-labelledby="chart-heading" aria-describedby="chart-help">
+        <g id="chart-axis" aria-hidden="true"></g>
+        <g id="chart-score" aria-hidden="true"></g>
+        <g id="chart-notes" aria-hidden="true"></g>
+        <g id="chart-events"></g>
+      </svg>
+    </div>
+    <p id="chart-help" class="sr-only">Match events are buttons in time order, home team above the
+      line and away team below. Use the arrow keys to move between them, Home and End for the first
+      and last, and Enter to open the event in the match timeline. The score and analysis lanes are
+      also listed in the match timeline.</p>
+    <ul class="chart-legend" aria-hidden="true">
+      <li><span class="lg lg-goal"></span>Goal</li>
+      <li><span class="lg lg-red"></span>Red card</li>
+      <li><span class="lg lg-sub"></span>Substitution</li>
+      <li><span class="lg lg-period"></span>Start or end of a half</li>
+      <li><span class="lg lg-home"></span>Home score</li>
+      <li><span class="lg lg-away"></span>Away score</li>
+      <li><span class="lg lg-published"></span>Insight published</li>
+      <li><span class="lg lg-revised"></span>Insight revised</li>
+      <li><span class="lg lg-retracted"></span>Insight retracted</li>
+    </ul>
+    <div id="chart-readout" class="chart-readout">
+      <p class="quiet">Select an event on the chart to see its details.</p>
+    </div>
+  </section>
+
   <main class="layout">
     <section class="story" aria-labelledby="story-heading">
       <div class="section-head">
