@@ -20,7 +20,14 @@ from pathlib import Path
 import pytest
 
 from matcheyes.api.server import CSP, STATIC_DIR, STATIC_FILES
-from matcheyes.broadcast.contracts import Cue, CueTimeline
+from matcheyes.broadcast.contracts import (
+    Cue,
+    CueTimeline,
+    InsightSource,
+    MomentSource,
+    RetractionSource,
+    StatusSource,
+)
 from tests.architecture.test_agent_isolation import _hidden_vocabulary
 from tests.architecture.test_stage7_security import PERSISTENCE
 from tests.support.imports import imported_modules, python_files
@@ -138,8 +145,13 @@ def test_the_script_has_no_injection_sink_dynamic_code_or_storage() -> None:
     ):
         assert sink not in JS, sink
     assert JS.startswith('"use strict";')
-    assert re.findall(r"fetch\(([^)]*)\)", JS) == ['"/matches"']
+    assert sorted(re.findall(r"fetch\(([^)]*)\)", JS)) == ['"/matches"', "workUrl"]
     assert re.findall(r"new EventSource\(\"([^\"]*)\"", JS) == ["/matches/"]
+    work_url = re.findall(r"const workUrl = ([^;]*);", JS)
+    assert work_url == [
+        '"/matches/" + encodeURIComponent($("match").value) + "/storylines/" +\n'
+        '    encodeURIComponent(storyline) + "/revisions/" + encodeURIComponent(String(revision))'
+    ]
 
 
 def test_the_script_renders_cue_sections_and_computes_no_claim() -> None:
@@ -155,8 +167,22 @@ def test_the_script_renders_cue_sections_and_computes_no_claim() -> None:
         "snapshot_id",
     }, cue_fields
     source_fields = set(re.findall(r"\b(?:src|cue\.source)\.([a-z_]+)", JS))
-    assert source_fields <= {"verdict", "evidence_integrity", "score", "status"}, source_fields
+    assert source_fields <= {
+        "verdict",
+        "evidence_integrity",
+        "score",
+        "status",
+        "storyline_id",
+        "revision",
+        "moment",
+        "team_id",
+        "reason",
+    }, source_fields
     assert "s.text" in JS and "sections" in JS
+    sources = (MomentSource, InsightSource, RetractionSource, StatusSource)
+    emitted = set().union(*(set(model.model_fields) for model in sources))
+    assert source_fields <= emitted, source_fields - emitted
+    assert cue_fields <= set(Cue.model_fields), cue_fields - set(Cue.model_fields)
     lowered = JS.lower()
     for reasoning in ("because", "caused", "due to", "led to", "hypothes", "metric", "claim"):
         assert reasoning not in lowered, reasoning

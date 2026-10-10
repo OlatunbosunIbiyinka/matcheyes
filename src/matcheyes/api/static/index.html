@@ -3,57 +3,122 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>MatchEyes - live broadcast surface</title>
+  <title>MatchEyes - See beyond the score</title>
   <link rel="stylesheet" href="/static/app.css">
 </head>
 <body>
-  <header>
-    <div>
-      <h1>MatchEyes</h1>
-      <p class="tag">Synthetic, fictional match. Deterministic replay of verified, living insights.</p>
-    </div>
-    <form id="controls">
-      <label>Match <select id="match"></select></label>
-      <label>Audience
-        <select id="audience">
-          <option value="fan">Fan</option>
-          <option value="broadcaster">Broadcaster</option>
-        </select>
-      </label>
-      <label>Favourite club <select id="club"><option value="">None</option></select></label>
-    </form>
+  <a class="skip" href="#story-heading">Skip to the Match Story</a>
+
+  <header class="topbar">
+    <p class="brand"><span class="wordmark">MatchEyes</span><span class="tagline">See beyond the score</span></p>
+    <p id="provenance" class="provenance"></p>
+    <a id="about-link" class="about-link" href="#about">About this replay</a>
   </header>
 
-  <section id="scoreboard" aria-live="polite">
-    <span id="home" class="team"></span>
-    <span id="score" class="score">0-0</span>
-    <span id="away" class="team"></span>
-    <span id="clock" class="clock">-</span>
-    <span id="status" class="status">Connecting...</span>
+  <section class="hero" aria-labelledby="match-title">
+    <h1 id="match-title" class="sr-only">MatchEyes match replay</h1>
+    <p id="meta" class="hero-meta"></p>
+    <div class="scoreline">
+      <div class="team home">
+        <span id="home-crest" class="crest" aria-hidden="true"></span>
+        <span id="home" class="team-name"></span>
+        <span id="home-short" class="team-short" aria-hidden="true"></span>
+      </div>
+      <p class="score pending" id="score" aria-hidden="true">
+        <span id="home-score">-</span><span class="score-sep">:</span><span id="away-score">-</span>
+      </p>
+      <div class="team away">
+        <span id="away-crest" class="crest away" aria-hidden="true"></span>
+        <span id="away" class="team-name"></span>
+        <span id="away-short" class="team-short" aria-hidden="true"></span>
+      </div>
+    </div>
+    <p id="score-text" class="sr-only">Score not yet available.</p>
+    <div class="matchstate">
+      <p class="minute"><span class="sr-only">Match minute </span><span id="clock">-</span></p>
+      <p id="phase" class="phase"></p>
+      <p id="replay-state" class="replay-state r-connecting">Connecting</p>
+    </div>
   </section>
 
-  <main>
-    <section id="insights" aria-live="polite">
-      <h2>Live insights</h2>
-      <p id="empty" class="empty">No verified insight available.</p>
-      <div id="cards"></div>
+  <form id="controls" class="controls" aria-label="View options">
+    <label class="field">
+      <span class="field-label">Match</span>
+      <select id="match"></select>
+    </label>
+    <fieldset class="field segmented">
+      <legend class="field-label">View</legend>
+      <div class="options">
+        <label><input type="radio" name="audience" value="fan" checked><span>Fan</span></label>
+        <label><input type="radio" name="audience" value="broadcaster"><span>Broadcaster</span></label>
+      </div>
+    </fieldset>
+    <label class="field">
+      <span class="field-label">Favourite club</span>
+      <select id="club"><option value="">None</option></select>
+    </label>
+  </form>
+
+  <div id="connection" class="connection" hidden>
+    <p id="connection-text"></p>
+    <button id="retry" class="text-button" type="button" hidden>Try again</button>
+  </div>
+
+  <main class="layout">
+    <section class="story" aria-labelledby="story-heading">
+      <div class="section-head">
+        <h2 id="story-heading" tabindex="-1">The Match Story</h2>
+        <p class="section-dek">What is changing the game, and why it matters.</p>
+      </div>
+      <p id="feed-status" class="feed-status"></p>
+      <div id="empty" class="empty">
+        <h3>No verified insight at the moment</h3>
+        <p>An insight appears here when MatchEyes detects a change in the match and the verifier
+          accepts how it is described. Factual match events appear in the timeline.</p>
+      </div>
+      <div id="cards" class="story-items"></div>
     </section>
-    <aside>
-      <h2>Key moments</h2>
-      <ol id="moments" class="moments"></ol>
+
+    <aside class="timeline" aria-labelledby="timeline-heading">
+      <div class="section-head">
+        <h2 id="timeline-heading">Match timeline</h2>
+      </div>
+      <fieldset class="segmented view-toggle">
+        <legend class="sr-only">Show</legend>
+        <div class="options">
+          <label><input type="radio" name="lane" value="moments" checked><span>Match events</span></label>
+          <label><input type="radio" name="lane" value="log"><span>Analysis log</span></label>
+        </div>
+      </fieldset>
+      <div id="lane-moments">
+        <p id="moments-empty" class="quiet">No match events yet.</p>
+        <ol id="moments" class="events"></ol>
+      </div>
+      <div id="lane-log" hidden>
+        <p class="quiet">Insights published, revised and retracted by MatchEyes. These are analysis,
+          not match events.</p>
+        <p id="log-empty" class="quiet">No analysis updates yet.</p>
+        <ol id="log" class="analysis"></ol>
+      </div>
     </aside>
   </main>
 
-  <section>
-    <h2>Revisions and retractions</h2>
-    <ol id="log" class="log"></ol>
+  <section id="about" class="about" aria-labelledby="about-heading">
+    <details id="about-details">
+      <summary><h2 id="about-heading">About this replay</h2></summary>
+      <div id="about-body" class="about-body"></div>
+    </details>
   </section>
 
-  <footer>
-    Every insight card is the Stage 6 verified view of a lifecycle revision, shown only while that
-    revision is current. Moments are factual match events. All text is shown exactly as the server
-    sent it; this page computes nothing about the match.
+  <footer class="footer">
+    <p>MatchEyes is a demonstration on fictional football data. Moments are factual match events;
+      insights are verified views, shown only while they are current. All text is shown exactly as
+      the server sent it; this page computes nothing about the match.</p>
+    <p>Not affiliated with, or endorsed by, any league, club or broadcaster.</p>
   </footer>
+
+  <div id="announcer" class="sr-only" role="status" aria-live="polite"></div>
+  <div id="alerts" class="sr-only" role="alert" aria-live="assertive"></div>
   <script src="/static/app.js"></script>
 </body>
 </html>
