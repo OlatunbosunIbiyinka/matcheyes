@@ -2,8 +2,9 @@
 
 Status: **deterministic engine (Stages 0–3), agentic investigation (Stage 4), evidence audit
 (Stage 5), deterministic personalization (Stage 6), a snapshot-anchored insight lifecycle
-(Stage 7) and a broadcast cue contract with a live, read-only presentation surface (Stage 8)**.
-Azure choices remain open.
+(Stage 7), a broadcast cue contract with a live, read-only presentation surface (Stage 8), and a
+Microsoft Foundry model behind the reasoning boundary, replayed from recordings on the public
+surface (Stage 9, in review)**. The application is not deployed to Azure.
 
 ## Principle
 
@@ -84,6 +85,26 @@ through the environment. Facts come only from tools, and the verifier checks eve
 The method is in [agentic-investigation.md](agentic-investigation.md), the topology rationale
 in [ADR-0010](decisions/0010-agentic-investigation.md) and the results in
 [stage4-evaluation.md](stage4-evaluation.md). Network access exists only in `agents/llm.py`.
+
+## A Foundry model as an untrusted reasoner (Stage 9)
+
+```
+                      live (CLI / evaluation only)            public surface
+OpenAI-compatible ─► RecordingModel ─► transcript (sha256, pinned) ─► RecordedModel
+adapter (Entra)        one entry per request                        (no endpoint, no credentials)
+   │                                                                    │ miss ─► unavailable
+   └─ strict wire schemas (agents/wire.py) ─► contracts ─► tools ─► verifier ─► audits
+```
+
+The hosted model fills a role behind the same `ReasoningModel` protocol and its replies pass
+the same contracts, tools, verifier and audits; it never writes a `FinalInsight` or screen text
+([ADR-0015](decisions/0015-foundry-model-as-untrusted-reasoner.md)). Measured on held-out data,
+the model as Investigator is inadequate, so the adopted configuration (B′, `agents/split.py`)
+keeps the rule-based reasoner as Investigator and uses the model as Challenger. Live calls happen
+only from the CLI (`record`, `matcheyes_eval stage9 --record`); `serve` replays pinned recordings
+and never constructs a live model. `GET /matches/{id}/storylines/{sid}/revisions/{n}` shows the
+work behind a published revision without model free text
+([stage9-evaluation.md](stage9-evaluation.md)).
 
 ## Personalization (Stage 6)
 
@@ -168,7 +189,7 @@ EVENT -> DETECT -> INVESTIGATE -> VERIFY -> EXPLAIN -> PERSONALIZE
 | --- | --- | --- |
 | EVENT | deterministic | ingest, validate, order, de-duplicate; contiguous watermark, conflicts rejected (Stage 7) |
 | DETECT | deterministic | momentum shifts, key moments; produces evidence objects |
-| INVESTIGATE | agentic | investigator and challenger over typed tool evidence (Stage 4) |
+| INVESTIGATE | agentic | investigator and challenger over typed tool evidence (Stage 4); optionally a recorded Foundry model as Challenger (Stage 9) |
 | VERIFY | deterministic | keep / downgrade claims through 9 gates, including provenance replay; audited independently ([evidence-audit.md](evidence-audit.md)) |
 | EXPLAIN | templated | narrative from verified findings only |
 | PERSONALIZE | deterministic, templated | Fan / Broadcaster / Analyst views of audited insights; preferences affect relevance only (Stage 6) |
@@ -193,11 +214,13 @@ in-memory process over Server-Sent Events on a deterministic replay clock
 storage, retries across processes and correlation IDs remain later infrastructure decisions.
 Corrections to already-accepted events are rejected, not applied.
 
-## Azure (deferred from Stage 8)
+## Azure
 
 Candidate services are evaluated by "what problem does this solve?", not by availability.
-Microsoft Foundry (models, tracing, evaluation) is the expected model platform; the Stage 4 LLM
-adapter already speaks to OpenAI-compatible and Azure OpenAI endpoints. Microsoft Agent
-Framework was evaluated in Stage 4 and not adopted for the current fixed-sequence topology
-([ADR-0010](decisions/0010-agentic-investigation.md)). Hosting (Container Apps vs AKS), data
-store and eventing are open. Decisions will be recorded as ADRs.
+Stage 9 uses one Microsoft Foundry (AIServices) resource with a `gpt-5-mini` deployment,
+reached with Microsoft Entra ID, for recording and evaluation only. Microsoft Agent Framework
+and Foundry Agent Service are not used: the fixed-sequence topology stays explicit
+([ADR-0010](decisions/0010-agentic-investigation.md), [ADR-0015](decisions/0015-foundry-model-as-untrusted-reasoner.md)).
+A credential-free container image of the replay server exists (`Dockerfile`, `deploy/`); the
+planned host is Azure Container Apps with one replica, but it has not been deployed. Data store
+and eventing remain open.

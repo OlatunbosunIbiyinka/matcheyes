@@ -20,6 +20,8 @@ records link to their replacement.
 | [0013](0013-snapshot-anchored-insight-lifecycle.md) | Snapshot-anchored insight lifecycle (idempotent event log with contiguous watermark, one canonical snapshot per closed minute, fresh evaluation per snapshot, deterministic storyline identity, append-only chained revisions, independent lifecycle audit; corrections deferred) | Accepted |
 | [0014](0014-broadcast-cue-contract-and-live-presentation-surface.md) | Broadcast cue contract and live presentation surface (content-addressed cues compiled from the lifecycle record, moments at the next snapshot close, explicit retractions, deterministic selection, one server-owned replay per match over stdlib SSE, read-only API, CSP static surface; truth pipeline unchanged) | Accepted |
 
+| [0015](0015-foundry-model-as-untrusted-reasoner.md) | A Microsoft Foundry model as an untrusted reasoner behind the existing boundary (strict wire schemas, Entra auth, role split B′ adopted on measured evidence, recorded runs only on the public surface, read-only show-your-work, field-attributed leakage) | Proposed |
+
 ## Planned (decided at the stage where evidence exists)
 
 | Topic | Stage |

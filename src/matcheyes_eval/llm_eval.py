@@ -100,6 +100,29 @@ class Item:
     candidate_id: str
     expected: frozenset[HypothesisKind]
     forbidden: tuple[str, ...]
+    truth: tuple[str, ...] = ()
+    """Forbidden vocabulary naming this item's hidden truth (`truth_terms`)."""
+
+
+def truth_terms(case: Case, dataset: str = "") -> tuple[str, ...]:
+    """The forbidden vocabulary that describes a case's hidden truth."""
+    spec = case.spec
+    terms = [spec.scenario_id.lower(), case.variant]
+    terms += [i.intervention_id.lower() for i in spec.interventions if len(i.intervention_id) > 2]
+    terms += [i.kind.value for i in spec.interventions]
+    if spec.interventions:
+        terms.append("intervention")
+    if any(i.trigger is InterventionTrigger.MANAGER_INSTRUCTION for i in spec.interventions):
+        terms.append("untriggered")
+    if case.variant == "twin":
+        terms += ["twin", "counterfactual"]
+    if spec.decoys:
+        terms.append("decoy")
+    if dataset == "F":
+        terms.append("adversarial")
+    if dataset in DATASETS:
+        terms.append(DATASETS[dataset])
+    return tuple(dict.fromkeys(terms))
 
 
 def _dataset(case: Case) -> str:
@@ -160,9 +183,17 @@ def build_items(
     """Blinded evaluation items. Truth is read here, once, to label items for scoring."""
     taken: Counter[str] = Counter()
     raw: list[
-        tuple[str, str, ObservableMatch, str, frozenset[HypothesisKind], tuple[str, ...]]
+        tuple[
+            str,
+            str,
+            ObservableMatch,
+            str,
+            frozenset[HypothesisKind],
+            tuple[str, ...],
+            tuple[str, ...],
+        ]
     ] = []
-    adversarial_pool: list[tuple[ObservableMatch, MatchWorkspace, tuple[str, ...]]] = []
+    adversarial_pool: list[tuple[ObservableMatch, MatchWorkspace, tuple[str, ...], Case]] = []
     for case in cases:
         dataset = _dataset(case)
         if taken[dataset] >= matches_per_dataset:
@@ -181,21 +212,25 @@ def build_items(
                 if i.team_id == team and case.variant == "planted"
                 for k in EXPECTED_EXPLANATIONS[i.kind]
             )
-            raw.append((dataset, "", case.match, cid, expected, forbidden))
-        adversarial_pool.append((case.match, ws, forbidden))
+            truth = truth_terms(case, dataset)
+            raw.append((dataset, "", case.match, cid, expected, forbidden, truth))
+        adversarial_pool.append((case.match, ws, forbidden, case))
     per_subtype: Counter[str] = Counter()
-    for match, ws, forbidden in adversarial_pool:
+    for match, ws, forbidden, case in adversarial_pool:
         for subtype, cid in _adversarial(ws).items():
             if per_subtype[subtype] < matches_per_dataset:
                 per_subtype[subtype] += 1
-                raw.append(("F", subtype, match, cid, frozenset(), forbidden))
-    for match, ws, forbidden in adversarial_pool[:matches_per_dataset]:
+                truth = truth_terms(case, "F")
+                raw.append(("F", subtype, match, cid, frozenset(), forbidden, truth))
+    for match, ws, forbidden, case in adversarial_pool[:matches_per_dataset]:
         for cid in _top(ws, 1):
-            raw.append(("F", "prompt_injection", _injected(match), cid, frozenset(), forbidden))
+            injected = _injected(match)
+            truth = truth_terms(case, "F")
+            raw.append(("F", "prompt_injection", injected, cid, frozenset(), forbidden, truth))
     random.Random(seed).shuffle(raw)  # noqa: S311 - reproducible blinding order, not security
     return [
-        Item(f"item-{i:04d}", d, s, m, cid, exp, forb)
-        for i, (d, s, m, cid, exp, forb) in enumerate(raw)
+        Item(f"item-{i:04d}", d, s, m, cid, exp, forb, truth)
+        for i, (d, s, m, cid, exp, forb, truth) in enumerate(raw)
     ]
 
 
@@ -229,6 +264,8 @@ class Metered:
         )
         self.calls: list[Call] = []
         self.leaks: list[str] = []
+        self.exchanges: list[tuple[AgentTask, str]] = []
+        """Every task sent and the reply ("" if the call failed), in call order."""
 
     def respond(self, task: AgentTask) -> str:
         payload = (COMMON_RULES + ROLE_INSTRUCTIONS[task.step] + fence(task)).lower()
@@ -238,8 +275,10 @@ class Metered:
             raw = self.inner.respond(task)
         except Exception:
             self.calls.append(Call(task.step, (self.clock() - start) * 1000, False, ""))
+            self.exchanges.append((task, ""))
             raise
         self.calls.append(Call(task.step, (self.clock() - start) * 1000, True, raw))
+        self.exchanges.append((task, raw))
         return raw
 
 

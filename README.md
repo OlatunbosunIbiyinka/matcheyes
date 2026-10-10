@@ -2,26 +2,34 @@
 
 **See beyond the score.**
 
-MatchEyes is an explainable football intelligence engine built on Azure for Microsoft's
+MatchEyes is an explainable football intelligence engine built for Microsoft's
 *Inside the Game: Developer Hackathon* — challenge: **The Synthetic Match Insights Engine for
-Premier League Studio**.
+Premier League Studio**. A Microsoft Foundry model (`gpt-5-mini`) has been evaluated behind the
+reasoning boundary, and the web surface replays a *recorded* run of it; the application runs
+locally (a container image exists; it is not deployed to Azure).
 
-It turns synthetic, football-realistic match events into real-time insights, key narratives,
-recaps and audience-personalized experiences for fans, studios, broadcasters and streaming
-platforms.
+It turns synthetic, football-realistic match events into explainable insights, key moments and
+audience-personalized views that update minute by minute as a match is replayed (deterministic,
+accelerated replay over Server-Sent Events; not production real-time ingestion) for fans,
+studios, broadcasters and streaming platforms.
 
 > Don't just tell me what happened. Explain why it matters.
 
-## How it works (target architecture)
+## How it works (as built through Stage 9)
 
 ```
-RAW MATCH EVENTS
+OBSERVABLE MATCH EVENTS
+  -> event log and per-minute snapshots
   -> deterministic football intelligence   (FACTS + ANALYTICS, no LLM)
-  -> moment / momentum detection
-  -> targeted agentic investigation        (AI REASONING)
-  -> evidence verification                 (EVIDENCE)
-  -> narrative generation                  (NARRATIVE)
+  -> contextual candidates                 (Stage 3)
+  -> investigator + challenger             (AI REASONING; rule-based reference by default,
+                                             or a recorded Foundry model run as Challenger)
+  -> evidence verification and audit       (EVIDENCE)
+  -> templated narrative                   (NARRATIVE)
+  -> living insight lifecycle              (storylines, append-only revisions)
   -> audience personalization              (PRESENTATION)
+  -> broadcast cue compiler
+  -> read-only API + SSE -> web surface
 ```
 
 Every insight is traceable: *insight -> hypothesis -> supporting metrics -> source events ->
@@ -31,11 +39,13 @@ See [`docs/architecture.md`](docs/architecture.md).
 
 ## Status
 
-Built in explicit, reviewed stages. **Current: Stage 8 — Broadcast cue contract and live match
-surface: the living insights of Stage 7, plus factual key moments, compiled into a timed,
-content-addressed cue stream and replayed to a minimal web surface over Server-Sent Events.**
-This is a deterministic replay of synthetic, fictional matches on one local process — not
-production real-time broadcasting, and no cloud hosting.
+Built in explicit, reviewed stages. **Current: Stage 9 (in review) — a real Microsoft Foundry
+model behind the existing reasoning boundary: an untrusted proposal generator whose output passes
+the same verifier and audits, evaluated on held-out data, recorded once and replayed on the web
+surface with a read-only "show the work" view.** The public surface never calls the model: it
+replays a pinned recording, and a missing entry shows as unavailable. This is a deterministic
+replay of synthetic, fictional matches on one local process — not production real-time model
+inference or broadcasting, and not cloud-hosted.
 
 | Stage | Scope | Status |
 | --- | --- | --- |
@@ -48,8 +58,8 @@ production real-time broadcasting, and no cloud hosting.
 | 5 | Evidence audit and verification hardening: lineage, provenance replay, entailment, independent claim auditor, three-layer red team, blinded LLM evaluation harness (live LLM not yet evaluated) | Done |
 | 6 | Personalization (Fan / Broadcaster / Analyst): audience views and feeds over verified insights, preferences for relevance only, independent view audit, presentation red team (no user study yet) | Done |
 | 7 | Snapshot-anchored insight lifecycle: event log with contiguous watermark, one canonical snapshot per closed minute, storylines with append-only revisions, lifecycle audit, replay evaluation (no corrections, no streaming infrastructure) | Done |
-| 8 | Broadcast cue contract and live match surface: moment / insight / revision / retraction / status cues, deterministic selection, one server-owned replay per match, read-only stdlib HTTP + SSE, CSP static page (no Foundry, no Azure) | In review |
-| 9 | Production readiness (Azure / cloud-native hosting deferred from Stage 8) | Not started |
+| 8 | Broadcast cue contract and live match surface: moment / insight / revision / retraction / status cues, deterministic selection, one server-owned replay per match, read-only stdlib HTTP + SSE, CSP static page (no Foundry, no Azure) | Done |
+| 9 | Foundry model behind the reasoning boundary: strict wire schemas, Entra auth, held-out evaluation of the real model (model as Investigator rejected on measured evidence; model as Challenger adopted), recorded runs replayed publicly, read-only show-your-work, container image (Azure deployment not performed; open findings in [stage9-evaluation.md](docs/stage9-evaluation.md)) | In review |
 | 10 | Product UX and hackathon polish | Not started |
 | 11 | Final submission | Not started |
 
@@ -82,6 +92,11 @@ uv run python -m matcheyes cues data/fixtures/minimal_match --audience fan --jso
 uv run python -m matcheyes_synth generate --scenario S05_red_card_reorganisation --out demo
 uv run python -m matcheyes serve demo/observable --speed 20
 
+# The bundled demo: a recorded Foundry run (model as Challenger), replayed; no credentials needed
+uv run python -m matcheyes serve deploy/matches --recordings deploy/recordings --speed 20
+# Record a match once against a configured model (MATCHEYES_LLM_*; see .env.example)
+uv run --extra azure python -m matcheyes record deploy/matches/<match_id> --out deploy/recordings --roles challenger
+
 # Synthetic matches (hidden-world tooling; never shipped with the engine)
 uv run python -m matcheyes_synth generate --scenario S02_press_surge   # default seed
 uv run python -m matcheyes_synth realism --split held-out --count 20
@@ -96,6 +111,9 @@ uv run python -m matcheyes_eval stage7 --split development --seeds 1
 uv run python -m matcheyes_eval stage8 --split development --seeds 1
 # LLM path: --profile live needs MATCHEYES_LLM_*; other profiles are SIMULATED, not a model
 uv run python -m matcheyes_eval llm --profile faithful --split held-out --seeds 2 --matches 7
+# Stage 9: re-score a recorded real-model run offline (--record makes live calls)
+uv run python -m matcheyes_eval stage9 --transcript data/recordings/eval/stage9-heldout-bprime.transcript.json.gz
+uv run python -m matcheyes_eval stage9-lifecycle --scenario S05_red_card_reorganisation --recordings deploy/recordings
 ```
 
 Full workflow: [`docs/development.md`](docs/development.md).
@@ -115,14 +133,15 @@ src/matcheyes/
   api/             PRESENTATION read-only HTTP + SSE, server-owned live replay, static web surface
 src/matcheyes_synth/  HIDDEN    fictional league, hidden state, scenarios, generator (never shipped)
 src/matcheyes_eval/   HIDDEN    scores engine output against the answer key (never shipped)
-tests/             unit, architecture-boundary and (later) evaluation tests
+tests/             unit, architecture-boundary, security and evaluation tests
 data/              synthetic data and test fixtures
 docs/              architecture, agent design, data model, evaluation, ADRs
 scripts/           local quality gate
 ```
 
-The Stage 8 web surface is three static files in `src/matcheyes/api/static/`. Infrastructure
-(`infra/`) and a fuller web app come in later stages.
+The web surface is three static files in `src/matcheyes/api/static/`. `Dockerfile` and `deploy/`
+(an observable match, its pinned recording, hash-pinned requirements) build a credential-free
+image of the replay server; it has not been deployed.
 
 ## Documentation
 
@@ -141,5 +160,6 @@ The Stage 8 web surface is three static files in `src/matcheyes/api/static/`. In
 - [Personalization](docs/personalization.md) and [Stage 6 evaluation](docs/stage6-evaluation.md)
 - [Living insights](docs/living-insights.md) and [Stage 7 evaluation](docs/stage7-evaluation.md)
 - [Broadcast cues and the live surface: Stage 8 evaluation](docs/stage8-evaluation.md)
+- [A Foundry model as an untrusted reasoner: Stage 9 evaluation](docs/stage9-evaluation.md)
 - [Development workflow](docs/development.md)
 - [Architecture decision records](docs/decisions/README.md)

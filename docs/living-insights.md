@@ -257,6 +257,17 @@ minutes on development and 22 on held-out
 about 0.2 s per snapshot on a development machine. That is fine
 for one match per closed minute, but it is not a production throughput claim.
 
+## Model-backed lifecycles (Stage 9)
+
+The lifecycle does not change when a hosted model fills a reasoning role. A model-backed
+lifecycle is recorded once (`python -m matcheyes record`) and replayed from its pinned
+transcript ([ADR-0015](decisions/0015-foundry-model-as-untrusted-reasoner.md)). Each snapshot's
+investigations ask the transcript, never a live endpoint. A request the transcript cannot answer
+makes that investigation `unavailable`, which the lifecycle records like any other failure:
+nothing is invented and nothing falls back to an earlier revision. Only the canonical delivery is
+recorded, so delivery perturbations that create new snapshots fail closed on replay. Recorded and
+replayed lifecycles are identical on the S05 demo ([stage9-evaluation.md](stage9-evaluation.md)).
+
 ## Limitations
 
 * **No corrections.** A changed payload under an existing event ID is rejected as a conflict
@@ -265,7 +276,7 @@ for one match per closed minute, but it is not a production throughput claim.
 * **Detection latency.** Insights lag their onset by the detector's confirmation window.
 * **Full recomputation.** Every snapshot reruns the pipeline. There is no incremental analytics.
 * **In memory only.** The log and the state live in one process. Persistence, transport,
-  retries across processes and correlation IDs belong to the Stage 8 infrastructure decisions.
+  retries across processes and correlation IDs remain later infrastructure decisions.
 * **Identity is heuristic within the detector's own resolution.** Two genuinely different
   changes of the same key inside the suppression distance are one storyline, exactly as Stage 2
   treats them as one change.

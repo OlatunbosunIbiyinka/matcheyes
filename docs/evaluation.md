@@ -2,8 +2,8 @@
 
 Status: **deterministic evidence evaluation (Stages 2–3), investigation evaluation (Stage 4),
 verification hardening (Stage 5), personalization (Stage 6), the insight lifecycle
-(Stage 7) and the broadcast cue surface (Stage 8)**. "It looked good in the demo"
-is not evidence.
+(Stage 7), the broadcast cue surface (Stage 8) and a real Foundry model behind the reasoning
+boundary (Stage 9, in review)**. "It looked good in the demo" is not evidence.
 
 | Layer | Method | Introduced |
 | --- | --- | --- |
@@ -17,6 +17,7 @@ is not evidence.
 | Personalization | Construction invariants and an independent view audit on every view; same mandatory core across Fan / Broadcaster / Analyst; preference safety; feed placement; presentation red team (English only; no user study) ([report](stage6-evaluation.md)) | Stage 6 |
 | Insight lifecycle | Replay under reorder, shuffle, duplicates, conflicts, gaps, late fill, failure and tampering; byte-identical determinism; independent lifecycle audit with reproduction; lifecycle red team; storylines against planted truth ([report](stage7-evaluation.md)) | Stage 7 |
 | Broadcast surface | Cue traceability to the lifecycle and Stage 6 feed; retraction completeness; stale-card and stale-status minutes; moment coverage and delay; notice tautologies; card limit; order independence; failure behaviour; hidden-truth leaks; live replay and SSE equal to the offline compile; HTTP and static-surface security tests; performance ([report](stage8-evaluation.md)) | Stage 8 |
+| Real model | Live smoke gate; held-out blinded evaluation of recorded real-model runs against the reference (two role configurations); hard invariants; field-attributed prompt leakage; Stage 5 tampering on model investigations; replay equal to the live run; Stage 7/8 properties on a recorded lifecycle; show-your-work free-text isolation ([report](stage9-evaluation.md)) | Stage 9 |
 | Narrative quality | Rubric-based evaluation (Foundry evaluators where verified) | Stages 5–10 |
 
 ## Planted-truth metrics
@@ -184,8 +185,29 @@ from the cue contract alone. No targets were set. Held-out, 1 seed per scenario,
 Stage 8 is a deterministic replay over SSE from one local process, not hosted real-time
 broadcasting.
 
+## Stage 9 objectives and results
+
+Stage 9 is judged on recorded live runs of `gpt-5-mini`, re-scored offline
+([stage9-evaluation.md](stage9-evaluation.md)). No quality targets were set; hard invariants must
+be zero. Held-out, 115 items:
+
+| Objective | B: model as both roles | B′: model as Challenger (adopted) |
+| --- | --- | --- |
+| Explanation at hypothesised or above (reference 16–50%) | 0% in every dataset | equal to the reference except E (5/12 vs 6/12) |
+| Same verified result as reference | 50–83% | 92–100% |
+| Grounding of model assertions | 15–18% | 89–100% |
+| Hidden-truth leakage (combined) / engine-authored / unresolved | 2 / 0 / 2 | 0 / 0 / 0 |
+| Final auditor findings; broken lineage; injection; model text presented | 1; 0; 0; 0 | 0; 0; 0; 0 |
+| Tampering detected (evidence / insight) | 53/53; 916/916 | 54/54; 1,004/1,004 |
+| Replays identical to the live run | 207/207 | 207/207 |
+
+The recorded S05 lifecycle (B′) replays identically and passes every applicable Stage 7 and
+Stage 8 property. The public surface replays recordings; it is not real-time model inference.
+
 ## Test categories
 
 - **Unit**: fast, deterministic, no network. Always run in CI.
-- **Integration** (`@pytest.mark.integration`): real model / Azure calls. Opt-in.
+- **Integration** (`@pytest.mark.integration`): slower tests over generated matches and the
+  local server; they run by default. The live-model smoke test is also marked integration and is
+  skipped unless `MATCHEYES_LLM_*` is configured.
 - **Evaluation**: scenario suites over generated matches, scored against the answer key.

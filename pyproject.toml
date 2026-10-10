@@ -1,7 +1,7 @@
 [project]
 name = "matcheyes"
 version = "0.0.1"
-description = "MatchEyes — See beyond the score. An explainable football intelligence engine on Azure."
+description = "MatchEyes — See beyond the score. An explainable football intelligence engine."
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "MIT" }
@@ -9,6 +9,11 @@ authors = [{ name = "Olatunbosun Ibiyinka" }]
 dependencies = [
     "pydantic>=2.9",
 ]
+
+[project.optional-dependencies]
+# Only for MATCHEYES_LLM_AUTH=entra (Microsoft Entra ID tokens); imported solely by
+# matcheyes.agents.entra. The engine and the public web surface never need it.
+azure = ["azure-identity>=1.19"]
 
 [project.scripts]
 matcheyes = "matcheyes.__main__:main"
@@ -74,6 +79,11 @@ strict = true
 mypy_path = "src"
 packages = ["matcheyes", "matcheyes_synth", "matcheyes_eval"]
 plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+# The optional `azure` extra is not installed in the default environment.
+module = ["azure", "azure.*"]
+ignore_missing_imports = true
 
 [tool.pydantic-mypy]
 init_forbid_extra = true

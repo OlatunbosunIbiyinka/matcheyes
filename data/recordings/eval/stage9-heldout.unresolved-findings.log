@@ -1,0 +1,14 @@
+== item-0015: dataset A subtype -
+   expected (planted explanation for this candidate): ['tactical_change']
+   truth vocabulary: ('s02_press_surge', 'planted', 'press_surge', 'intervention', 'untriggered')
+   final: verdict insufficient_evidence; leading None; strength associated
+   presented narrative contains 'untriggered': False
+   recorded requests for this item: 57; forbidden terms in engine fields: none; model replies containing 'untriggered': 1
+== item-0009: dataset A subtype -
+   expected (planted explanation for this candidate): ['score_state_response']
+   truth vocabulary: ('s03_game_state_deep_block', 'planted', 'deep_block', 'intervention')
+   final: verdict insufficient_evidence; leading None; strength associated
+   presented narrative contains 'intervention': False
+   recorded requests for this item: 67; forbidden terms in engine fields: none; model replies containing 'intervention': 1
+model replies containing 'untriggered': 3 for items whose truth includes it, 7 for items whose truth does not
+model replies containing 'intervention': 1 for items whose truth includes it, 2 for items whose truth does not

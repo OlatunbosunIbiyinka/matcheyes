@@ -93,6 +93,7 @@ from matcheyes.lifecycle.contracts import (
     WithdrawalReason,
 )
 from matcheyes.lifecycle.engine import LifecycleEngine, replay
+from matcheyes.lifecycle.evaluate import Evaluator, evaluate_snapshot
 from matcheyes.lifecycle.feed import audience_feed, current_revisions, notice_text
 from matcheyes.personalization.contracts import (
     Audience,
@@ -249,8 +250,8 @@ class Reference:
         return self.feeds[sid, key]
 
 
-def build_reference(case: Case, r: Stage8Results) -> Reference:
-    cached = CachedEvaluator()
+def build_reference(case: Case, r: Stage8Results, base: Evaluator = evaluate_snapshot) -> Reference:
+    cached = CachedEvaluator(base)
     started = time.perf_counter()
     engine = replay(case.match.info, case.match.events, cached)
     r.replay_seconds.append(time.perf_counter() - started)
@@ -707,8 +708,11 @@ def _live(ref: Reference, offline: dict[Key, CueTimeline], r: Stage8Results) -> 
     return bodies
 
 
-def evaluate_case(case: Case, r: Stage8Results, live: bool) -> None:
-    ref = build_reference(case, r)
+def evaluate_case(
+    case: Case, r: Stage8Results, live: bool, base: Evaluator = evaluate_snapshot
+) -> None:
+    """`base` evaluates snapshots: the reference pipeline, or (Stage 9) a recorded model."""
+    ref = build_reference(case, r, base)
     r.matches += 1
     r.snapshots += len(ref.state.snapshots)
     offline: dict[Key, CueTimeline] = {}

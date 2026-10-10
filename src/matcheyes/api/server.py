@@ -6,6 +6,7 @@
     GET /matches                            the allow-listed matches (teams, venue)
     GET /matches/{id}/timeline?audience=&club=   the canonical cues published so far
     GET /matches/{id}/stream?audience=&club=     the same cues, live, as Server-Sent Events
+    GET /matches/{id}/storylines/{sid}/revisions/{n}   the work behind one published revision
 
 There is no write, ingest, truth or debug endpoint: every other method is refused. Match IDs
 must be in the allow-list, `audience` is fan or broadcaster, `club` is empty or one of the two
@@ -15,16 +16,19 @@ its `LiveMatch`, however many viewers connect.
 """
 
 import json
+import re
 import sys
 import threading
+from collections.abc import Mapping
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
-from matcheyes.api.live import Evaluator, LiveMatch, Message, SurfaceKey
+from matcheyes.api.live import Backend, Evaluator, LiveMatch, Message, SurfaceKey
 from matcheyes.broadcast.contracts import BROADCAST_VERSION
 from matcheyes.domain.match import ObservableMatch
+from matcheyes.lifecycle.explain import work_rows
 from matcheyes.personalization.contracts import Audience
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
@@ -49,6 +53,8 @@ MAX_STREAMS = 32
 HEARTBEAT_SECONDS = 15.0
 MAX_PATH = 256
 QUERY_KEYS = frozenset({"audience", "club"})
+STORYLINE_ID = re.compile(r"sl-[A-Za-z0-9_.-]{1,157}")
+REVISION = re.compile(r"[1-9][0-9]{0,3}")
 
 
 class ClientError(Exception):
@@ -67,9 +73,18 @@ class BroadcastApp:
         pause: float = 20.0,
         max_streams: int = MAX_STREAMS,
         evaluator: Evaluator | None = None,
+        backends: Mapping[str, Backend] | None = None,
     ) -> None:
+        """`backends` overrides, per match, the shared `evaluator` and adds reasoner identity and
+        an explainer; a match without one is reasoned by the reference reasoner."""
         self.catalog = catalog
-        self.live = {mid: LiveMatch(m, speed, loop, pause, evaluator) for mid, m in catalog.items()}
+        backends = backends or {}
+        self.live = {}
+        for mid, m in catalog.items():
+            b = backends.get(mid, Backend(evaluator))
+            self.live[mid] = LiveMatch(
+                m, speed, loop, pause, b.evaluator or evaluator, b.reasoner, b.explainer
+            )
         self.static = {
             route: ((STATIC_DIR / name).read_bytes(), ctype)
             for route, (name, ctype) in STATIC_FILES.items()
@@ -93,9 +108,26 @@ class BroadcastApp:
                     "away": _team(
                         info.away.team_id, info.away.club.name, info.away.club.short_name
                     ),
+                    "reasoner": self.live[mid].reasoner.model_dump(mode="json"),
                 }
             )
         return out
+
+    def explain(self, match_id: str, storyline_id: str, number: str) -> bytes:
+        live = self.live.get(match_id)
+        if live is None:
+            raise ClientError(HTTPStatus.NOT_FOUND, "unknown match")
+        if not STORYLINE_ID.fullmatch(storyline_id) or not REVISION.fullmatch(number):
+            raise ClientError(HTTPStatus.BAD_REQUEST, "invalid storyline or revision")
+        live.start()
+        found = live.explain(storyline_id, int(number))
+        if found is None:
+            raise ClientError(HTTPStatus.NOT_FOUND, "revision not published")
+        edition, explanation = found
+        rows = ",".join(row.model_dump_json() for row in work_rows(explanation))
+        return (
+            f'{{"edition":{edition},"explanation":{explanation.model_dump_json()},"rows":[{rows}]}}'
+        ).encode()
 
     def resolve(self, match_id: str, query: str) -> tuple[LiveMatch, SurfaceKey]:
         live = self.live.get(match_id)
@@ -203,6 +235,12 @@ class Handler(BaseHTTPRequestHandler):
             self._json(HTTPStatus.OK, {"matches": self.app.matches()})
             return
         parts = path.split("/")
+        if len(parts) == 7 and parts[1::2] == ["matches", "storylines", "revisions"]:
+            if url.query:
+                raise ClientError(HTTPStatus.BAD_REQUEST, "unsupported query")
+            body = self.app.explain(parts[2], parts[4], parts[6])
+            self._send(HTTPStatus.OK, body, "application/json")
+            return
         if len(parts) == 4 and parts[1] == "matches" and parts[3] in ("timeline", "stream"):
             live, key = self.app.resolve(parts[2], url.query)
             if parts[3] == "timeline":

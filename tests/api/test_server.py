@@ -62,7 +62,9 @@ def test_health_and_the_match_allow_list(address: tuple[str, int]) -> None:
         "synthetic",
         "home",
         "away",
+        "reasoner",
     }
+    assert entry["reasoner"]["kind"] == "reference"
     assert entry["synthetic"] is True
     assert set(entry["home"]) == {"team_id", "name", "short_name"}
 

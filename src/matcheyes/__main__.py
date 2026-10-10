@@ -16,29 +16,49 @@ python -m matcheyes cues <match_dir>        Stage 8 broadcast cue timeline (offl
 python -m matcheyes serve <root>            Stage 8 live surface: read-only HTTP + SSE replay of
                                             one match dir, or a dir of them (observable only)
     [--host 127.0.0.1] [--port 8000] [--speed 20] [--no-loop]
+    [--recordings DIR]                      replay recorded model transcripts (never live)
+python -m matcheyes record <match_dir>      Stage 9: record the configured model over every
+    --out DIR [--workers 16]                snapshot of a match into a pinned transcript
+    [--roles model|challenger]              both roles (B) or only the Challenger (B')
 """
 
 import argparse
+import json
 import os
 import sys
+import time
 from pathlib import Path
 
 from pydantic import ValidationError
 
 from matcheyes import __version__
-from matcheyes.agents.llm import LLMSettings, OpenAICompatibleModel
+from matcheyes.agents.llm import LLMSettings, live_model
 from matcheyes.agents.reasoning import ReasoningModel, RuleBasedReasoner
+from matcheyes.agents.recorded import RecordedModel
+from matcheyes.agents.split import ROLES
 from matcheyes.agents.tools import MatchWorkspace
 from matcheyes.analytics.analysis import MatchAnalysis, analyse_match
 from matcheyes.analytics.contextual import ContextualAnalysis, analyse_contextual
 from matcheyes.analytics.moments import Names
 from matcheyes.api.catalog import load_catalog
+from matcheyes.api.live import Backend, CachingEvaluator
 from matcheyes.api.server import BroadcastApp, BroadcastServer
 from matcheyes.broadcast.compiler import compile_timeline
 from matcheyes.broadcast.contracts import BROADCAST_AUDIENCES, CueTimeline
+from matcheyes.domain.match import ObservableMatch
 from matcheyes.ingestion.io import load_observable_match
 from matcheyes.lifecycle.engine import replay
+from matcheyes.lifecycle.explain import REFERENCE, Explainer, ReasonerIdentity
 from matcheyes.lifecycle.feed import LifecycleFeed, audience_feed, lifecycle_feed
+from matcheyes.lifecycle.recording import (
+    MODEL_CONFIG,
+    lifecycle_from,
+    record_lifecycle,
+    recorded_evaluator,
+    recorded_reasoner,
+    replayed_lifecycle,
+    unavailable_insights,
+)
 from matcheyes.orchestration.investigation import MatchInvestigation, investigate_match
 from matcheyes.personalization.contracts import Audience, PersonalizationProfile
 from matcheyes.personalization.feed import build_feed, format_feed
@@ -199,15 +219,20 @@ def _serve(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
         parser.error("--port must be between 0 and 65535")
     try:
         catalog = load_catalog(args.root)
+        backends = _backends(catalog, args.recordings)
     except (OSError, ValueError) as error:
         parser.error(f"cannot load matches: {error}")
-    app = BroadcastApp(catalog, args.speed, loop=not args.no_loop)
+    app = BroadcastApp(catalog, args.speed, loop=not args.no_loop, backends=backends)
     server = BroadcastServer((args.host, args.port), app)
     host, port = server.server_address[:2]
     sys.stdout.write(
         f"MatchEyes broadcast surface on http://{host!s}:{port} - {len(catalog)} match(es), "
         f"speed x{args.speed:g}. Ctrl+C to stop.\n"
     )
+    for mid, backend in backends.items():
+        r = backend.reasoner
+        sha = f" transcript {r.transcript_sha256[:12]}" if r.transcript_sha256 else ""
+        sys.stdout.write(f"  {mid}: {r.kind} reasoner {r.name}{sha}\n")
     sys.stdout.flush()
     try:
         server.serve_forever()
@@ -218,11 +243,116 @@ def _serve(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
     return 0
 
 
+PINS_FILE = "pins.json"
+TRANSCRIPT_SUFFIX = ".transcript.json.gz"
+
+
+def _pins(directory: Path) -> dict[str, str]:
+    path = directory / PINS_FILE
+    if not path.is_file():
+        return {}
+    pins = json.loads(path.read_text("utf-8"))
+    if not isinstance(pins, dict) or not all(isinstance(v, str) for v in pins.values()):
+        raise ValueError(f"{path} must map match IDs to transcript hashes")
+    return pins
+
+
+def _backends(catalog: dict[str, ObservableMatch], recordings: Path | None) -> dict[str, Backend]:
+    """Per match: the recorded model if `recordings` pins a transcript for it (replayed, never
+    live; a missing or damaged transcript makes its investigations unavailable, it never falls
+    back), otherwise the reference reasoner. Either way, an explainer over the same reasoner."""
+    pins = _pins(recordings) if recordings else {}
+    backends: dict[str, Backend] = {}
+    for mid, match in catalog.items():
+        if recordings is None or mid not in pins:
+            explainer = Explainer(match, RuleBasedReasoner(), REFERENCE)
+            backends[mid] = Backend(None, REFERENCE, explainer)
+            continue
+        model = RecordedModel.load(recordings / f"{mid}{TRANSCRIPT_SUFFIX}", pins[mid])
+        if not model.usable:
+            sys.stderr.write(f"  {mid}: transcript unusable ({'; '.join(model.problems)})\n")
+        reasoner = recorded_reasoner(model)
+        identity = ReasonerIdentity(
+            kind="recorded-model",
+            name=reasoner.name,
+            deployment=model.metadata.get("deployment"),
+            served_models=model.metadata.get("served_models"),
+            transcript_sha256=pins[mid],
+        )
+        backends[mid] = Backend(
+            CachingEvaluator(recorded_evaluator(model)),
+            identity,
+            Explainer(match, reasoner, identity, MODEL_CONFIG),
+        )
+    return backends
+
+
+def _record(args: argparse.Namespace) -> int:
+    settings = LLMSettings.from_env(os.environ)
+    if settings is None:
+        sys.stderr.write("LLM not configured: set MATCHEYES_LLM_ENDPOINT, _MODEL (and _AUTH).\n")
+        return 2
+    live = live_model(settings)
+    match = load_observable_match(args.match_dir)
+    match_id = match.info.match_id
+    args.out.mkdir(parents=True, exist_ok=True)
+    started = time.perf_counter()
+
+    def progress(done: int, total: int) -> None:
+        if done % 5 == 0 or done == total:
+            sys.stdout.write(
+                f"  {done}/{total} snapshots, {live.usage.calls} calls, "
+                f"{time.perf_counter() - started:.0f}s\n"
+            )
+            sys.stdout.flush()
+
+    recorder, evaluations = record_lifecycle(match, live, args.workers, progress, args.roles)
+    transcript = recorder.transcript(
+        {
+            "deployment": settings.model,
+            "served_models": ",".join(sorted(live.usage.served)),
+            "roles": args.roles,
+        }
+    )
+    path = args.out / f"{match_id}{TRANSCRIPT_SUFFIX}"
+    sha = transcript.write(path)
+    pins = {**_pins(args.out), match_id: sha}
+    (args.out / PINS_FILE).write_text(
+        json.dumps(dict(sorted(pins.items())), indent=2) + "\n", "utf-8", newline="\n"
+    )
+    replayed = RecordedModel.load(path, expected_sha256=sha)
+    identical = (
+        lifecycle_from(match, evaluations).model_dump_json()
+        == replayed_lifecycle(match, replayed).model_dump_json()
+    )
+    insights = sum(len(e.insights) for e in evaluations.values())
+    summary = {
+        "match_id": match_id,
+        "transcript": str(path),
+        "transcript_sha256": sha,
+        "reasoner": transcript.reasoner,
+        "metadata": transcript.metadata,
+        "snapshots": len(evaluations),
+        "investigations": insights,
+        "unavailable": unavailable_insights(list(evaluations.values())),
+        "entries": len(transcript.entries),
+        "calls": live.usage.calls,
+        "prompt_tokens": live.usage.prompt_tokens,
+        "completion_tokens": live.usage.completion_tokens,
+        "usage_reported": live.usage.reported,
+        "seconds": round(time.perf_counter() - started, 1),
+        "replay_identical": identical,
+        "transcript_problems": replayed.problems,
+    }
+    sys.stdout.write(json.dumps(summary, indent=2) + "\n")
+    return 0 if identical and not replayed.problems else 1
+
+
 def _model(use_llm: bool) -> ReasoningModel | None:
     if not use_llm:
         return RuleBasedReasoner()
     settings = LLMSettings.from_env(os.environ)
-    return None if settings is None else OpenAICompatibleModel(settings)
+    return None if settings is None else live_model(settings)
 
 
 def _profile(
@@ -289,6 +419,23 @@ def main(argv: list[str] | None = None) -> int:
     serve.add_argument("--port", type=int, default=8000)
     serve.add_argument("--speed", type=float, default=20.0, help="Match seconds per second.")
     serve.add_argument("--no-loop", action="store_true", help="Replay once, then stay idle.")
+    serve.add_argument(
+        "--recordings",
+        type=Path,
+        help="Dir of recorded model transcripts + pins.json; pinned matches replay them.",
+    )
+    record = sub.add_parser(
+        "record", help="Record the configured model over every snapshot of a match (live calls)."
+    )
+    record.add_argument("match_dir", type=Path)
+    record.add_argument("--out", type=Path, required=True, help="Recordings directory.")
+    record.add_argument("--workers", type=int, default=16, help="Parallel snapshot evaluations.")
+    record.add_argument(
+        "--roles",
+        choices=ROLES,
+        default="model",
+        help="The model as Investigator and Challenger, or only as Challenger.",
+    )
     args = parser.parse_args(argv)
 
     if args.command is None:
@@ -300,6 +447,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cues(parser, args)
     if args.command == "serve":
         return _serve(parser, args)
+    if args.command == "record":
+        return _record(args)
     profile = _profile(parser, args) if args.command == "investigate" else None
     match = load_observable_match(args.match_dir)
     if args.command == "investigate":

@@ -1,0 +1,254 @@
+{
+  "match_id": "m-b71a80f94d25",
+  "competition": "Meridian League",
+  "season": "2026-27",
+  "matchday": 14,
+  "kickoff": "2026-11-14T15:00:00Z",
+  "venue": "Estuary Road",
+  "referee": "C. Marrow",
+  "home": {
+    "club": {
+      "club_id": "saltmarsh",
+      "name": "Saltmarsh Rovers",
+      "short_name": "SMR",
+      "primary_colour": "#1E6B52",
+      "secondary_colour": "#FFFFFF"
+    },
+    "formation": "4-2-3-1",
+    "starting_xi": [
+      {
+        "player_id": "saltmarsh-01",
+        "name": "S. Ivorowe",
+        "shirt_number": 1,
+        "position": "GK"
+      },
+      {
+        "player_id": "saltmarsh-17",
+        "name": "J. Yarshaw",
+        "shirt_number": 17,
+        "position": "RB"
+      },
+      {
+        "player_id": "saltmarsh-03",
+        "name": "E. Lorshaw",
+        "shirt_number": 3,
+        "position": "CB"
+      },
+      {
+        "player_id": "saltmarsh-20",
+        "name": "F. Lorby",
+        "shirt_number": 20,
+        "position": "CB"
+      },
+      {
+        "player_id": "saltmarsh-02",
+        "name": "M. Wendale",
+        "shirt_number": 2,
+        "position": "LB"
+      },
+      {
+        "player_id": "saltmarsh-10",
+        "name": "P. Fenock",
+        "shirt_number": 10,
+        "position": "DM"
+      },
+      {
+        "player_id": "saltmarsh-12",
+        "name": "K. Galstead",
+        "shirt_number": 12,
+        "position": "DM"
+      },
+      {
+        "player_id": "saltmarsh-26",
+        "name": "T. Galwell",
+        "shirt_number": 26,
+        "position": "AM"
+      },
+      {
+        "player_id": "saltmarsh-13",
+        "name": "D. Ashhart",
+        "shirt_number": 13,
+        "position": "RW"
+      },
+      {
+        "player_id": "saltmarsh-21",
+        "name": "G. Dralowe",
+        "shirt_number": 21,
+        "position": "LW"
+      },
+      {
+        "player_id": "saltmarsh-27",
+        "name": "V. Draford",
+        "shirt_number": 27,
+        "position": "ST"
+      }
+    ],
+    "bench": [
+      {
+        "player_id": "saltmarsh-11",
+        "name": "J. Yarlowe",
+        "shirt_number": 11,
+        "position": "GK"
+      },
+      {
+        "player_id": "saltmarsh-30",
+        "name": "T. Fenbourne",
+        "shirt_number": 30,
+        "position": "CB"
+      },
+      {
+        "player_id": "saltmarsh-05",
+        "name": "P. Sellowe",
+        "shirt_number": 5,
+        "position": "RB"
+      },
+      {
+        "player_id": "saltmarsh-24",
+        "name": "T. Lorwell",
+        "shirt_number": 24,
+        "position": "CM"
+      },
+      {
+        "player_id": "saltmarsh-31",
+        "name": "D. Quinton",
+        "shirt_number": 31,
+        "position": "AM"
+      },
+      {
+        "player_id": "saltmarsh-04",
+        "name": "A. Orrdale",
+        "shirt_number": 4,
+        "position": "RW"
+      },
+      {
+        "player_id": "saltmarsh-18",
+        "name": "M. Marlowe",
+        "shirt_number": 18,
+        "position": "ST"
+      }
+    ]
+  },
+  "away": {
+    "club": {
+      "club_id": "redmarsh",
+      "name": "Redmarsh Town",
+      "short_name": "RMT",
+      "primary_colour": "#B22222",
+      "secondary_colour": "#F5F5F5"
+    },
+    "formation": "5-3-2",
+    "starting_xi": [
+      {
+        "player_id": "redmarsh-01",
+        "name": "A. Elmwick",
+        "shirt_number": 1,
+        "position": "GK"
+      },
+      {
+        "player_id": "redmarsh-26",
+        "name": "K. Ulvane",
+        "shirt_number": 26,
+        "position": "RWB"
+      },
+      {
+        "player_id": "redmarsh-17",
+        "name": "D. Quinwick",
+        "shirt_number": 17,
+        "position": "CB"
+      },
+      {
+        "player_id": "redmarsh-38",
+        "name": "B. Orrock",
+        "shirt_number": 38,
+        "position": "CB"
+      },
+      {
+        "player_id": "redmarsh-05",
+        "name": "A. Tormere",
+        "shirt_number": 5,
+        "position": "CB"
+      },
+      {
+        "player_id": "redmarsh-27",
+        "name": "L. Halhart",
+        "shirt_number": 27,
+        "position": "LWB"
+      },
+      {
+        "player_id": "redmarsh-19",
+        "name": "D. Pellowe",
+        "shirt_number": 19,
+        "position": "CM"
+      },
+      {
+        "player_id": "redmarsh-25",
+        "name": "M. Marstead",
+        "shirt_number": 25,
+        "position": "CM"
+      },
+      {
+        "player_id": "redmarsh-20",
+        "name": "V. Norrowe",
+        "shirt_number": 20,
+        "position": "CM"
+      },
+      {
+        "player_id": "redmarsh-02",
+        "name": "P. Belridge",
+        "shirt_number": 2,
+        "position": "ST"
+      },
+      {
+        "player_id": "redmarsh-30",
+        "name": "K. Ivodale",
+        "shirt_number": 30,
+        "position": "ST"
+      }
+    ],
+    "bench": [
+      {
+        "player_id": "redmarsh-21",
+        "name": "G. Lorgate",
+        "shirt_number": 21,
+        "position": "GK"
+      },
+      {
+        "player_id": "redmarsh-28",
+        "name": "M. Cornash",
+        "shirt_number": 28,
+        "position": "CB"
+      },
+      {
+        "player_id": "redmarsh-08",
+        "name": "L. Pelmere",
+        "shirt_number": 8,
+        "position": "RB"
+      },
+      {
+        "player_id": "redmarsh-24",
+        "name": "K. Varley",
+        "shirt_number": 24,
+        "position": "CM"
+      },
+      {
+        "player_id": "redmarsh-03",
+        "name": "L. Jarmere",
+        "shirt_number": 3,
+        "position": "AM"
+      },
+      {
+        "player_id": "redmarsh-13",
+        "name": "V. Wendale",
+        "shirt_number": 13,
+        "position": "RW"
+      },
+      {
+        "player_id": "redmarsh-34",
+        "name": "A. Fenstead",
+        "shirt_number": 34,
+        "position": "ST"
+      }
+    ]
+  },
+  "synthetic": true
+}

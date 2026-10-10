@@ -22,9 +22,10 @@ from matcheyes.broadcast.contracts import Cue, CueTimeline, TeamRef
 from matcheyes.domain.entities import Identifier, TeamSheet
 from matcheyes.domain.events import MatchEvent, PeriodEnd
 from matcheyes.domain.match import ObservableMatch
-from matcheyes.lifecycle.contracts import SnapshotHeader
+from matcheyes.lifecycle.contracts import LifecycleState, Revision, SnapshotHeader
 from matcheyes.lifecycle.engine import LifecycleEngine
 from matcheyes.lifecycle.evaluate import SnapshotEvaluation, evaluate_snapshot
+from matcheyes.lifecycle.explain import REFERENCE, ReasonerIdentity, RevisionExplanation
 from matcheyes.lifecycle.snapshot import Snapshot
 from matcheyes.personalization.contracts import Audience, PersonalizationProfile
 
@@ -34,6 +35,7 @@ EVALUATION_CACHE_LIMIT = 400
 
 SurfaceKey = tuple[Audience, Identifier | None]
 Evaluator = Callable[[Snapshot], SnapshotEvaluation]
+Explain = Callable[[Revision], RevisionExplanation]
 
 
 @dataclass(frozen=True)
@@ -55,11 +57,22 @@ class Surface:
     snapshots: int = 0
 
 
+@dataclass(frozen=True)
+class Backend:
+    """How one match is reasoned: its snapshot evaluator, who reasons, and who shows the work."""
+
+    evaluator: Evaluator | None = None
+    reasoner: ReasonerIdentity = REFERENCE
+    explainer: Explain | None = None
+
+
 @dataclass
 class Edition:
     number: int
     surfaces: dict[SurfaceKey, Surface]
     done: bool = False
+    state: LifecycleState | None = None
+    """The lifecycle state as far as this edition has replayed: what has been published."""
 
 
 class CachingEvaluator:
@@ -112,8 +125,11 @@ class LiveMatch:
         loop: bool = True,
         pause: float = 20.0,
         evaluator: Evaluator | None = None,
+        reasoner: ReasonerIdentity = REFERENCE,
+        explainer: Explain | None = None,
     ) -> None:
-        """`speed`: match seconds per wall second; 0 replays as fast as possible."""
+        """`speed`: match seconds per wall second; 0 replays as fast as possible.
+        `reasoner` names who reasoned (presentation only); `explainer` shows a revision's work."""
         if speed < 0:
             raise ValueError("speed must be non-negative")
         self.match = match
@@ -121,6 +137,8 @@ class LiveMatch:
         self.loop = loop
         self.pause = pause
         self.evaluator = evaluator or CachingEvaluator()
+        self.reasoner = reasoner
+        self.explainer = explainer
         self.events = tuple(sorted(match.events, key=lambda e: e.sequence))
         self.times = match_seconds(self.events)
         clubs = (None, match.info.home.team_id, match.info.away.team_id)
@@ -206,6 +224,7 @@ class LiveMatch:
             if tick is None and not any(new.values()):
                 continue
             with self.condition:
+                edition.state = state
                 for key, s in edition.surfaces.items():
                     if tick is not None:
                         s.messages.append(Message("clock", len(s.messages), tick))
@@ -218,6 +237,18 @@ class LiveMatch:
             edition.done = True
             self.replay_seconds.append(time.monotonic() - began)
             self.condition.notify_all()
+
+    def explain(self, storyline_id: str, number: int) -> tuple[int, RevisionExplanation] | None:
+        """The work behind a published revision, or None if it is not published (yet) or this
+        match has no explainer."""
+        with self.condition:
+            edition, state = self.edition.number, self.edition.state
+        if self.explainer is None or state is None:
+            return None
+        storyline = next((s for s in state.storylines if s.storyline_id == storyline_id), None)
+        if storyline is None or not 1 <= number <= len(storyline.revisions):
+            return None
+        return edition, self.explainer(storyline.revisions[number - 1])
 
     def timeline(self, key: SurfaceKey) -> tuple[int, bool, CueTimeline]:
         """The cues published so far on one surface, as a canonical timeline."""
