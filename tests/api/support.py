@@ -54,10 +54,13 @@ def get_json(address: tuple[str, int], path: str) -> tuple[int, Any]:
 
 
 def wait_done(live: LiveMatch, edition: int = 0) -> None:
+    """Raises TimeoutError (never AssertionError) if the edition does not finish in time."""
     with live.condition:
-        live.condition.wait_for(
+        done = live.condition.wait_for(
             lambda: live.edition.number > edition or (live.edition.done), timeout=300
         )
+    if not done:
+        raise TimeoutError(f"edition {edition} of {live.match.info.match_id} did not finish")
 
 
 def sse(body: bytes) -> list[dict[str, str]]:
