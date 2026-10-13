@@ -1,26 +1,77 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
   <title>MatchEyes - See beyond the score</title>
   <link rel="stylesheet" href="/static/app.css">
 </head>
 <body>
+  <svg class="sprite" aria-hidden="true" focusable="false">
+    <symbol id="me-ball" viewBox="0 0 24 24">
+      <clipPath id="me-ball-clip"><circle cx="12" cy="12" r="10.6"/></clipPath>
+      <circle class="fb-skin" cx="12" cy="12" r="10.6"/>
+      <g clip-path="url(#me-ball-clip)">
+        <polygon class="fb-patch" points="12.00,4.60 8.86,2.32 10.06,-1.37 13.94,-1.37 15.14,2.32"/>
+        <polygon class="fb-patch" points="19.04,9.71 20.24,6.02 24.12,6.02 25.31,9.71 22.18,11.99"/>
+        <polygon class="fb-patch" points="16.35,17.99 20.23,17.99 21.43,21.68 18.29,23.96 15.15,21.68"/>
+        <polygon class="fb-patch" points="7.65,17.99 8.85,21.68 5.71,23.96 2.57,21.68 3.77,17.99"/>
+        <polygon class="fb-patch" points="4.96,9.71 1.82,11.99 -1.31,9.71 -0.12,6.02 3.76,6.02"/>
+        <path class="fb-seam" d="M12 8.1V4.6M15.71 10.79L19.04 9.71M14.29 15.16L16.35 17.99M9.71 15.16L7.65 17.99M8.29 10.79L4.96 9.71M15.14 2.32L20.24 6.02M22.18 11.99L20.23 17.99M15.15 21.68H8.85M3.77 17.99L1.82 11.99M3.76 6.02L8.86 2.32"/>
+      </g>
+      <polygon class="fb-patch" points="12.00,8.10 15.71,10.79 14.29,15.16 9.71,15.16 8.29,10.79"/>
+      <circle class="fb-rim" cx="12" cy="12" r="10.6"/>
+    </symbol>
+    <symbol id="me-mark" viewBox="0 0 32 20">
+      <path class="bm-eye" d="M2 10C7.5 3 24.5 3 30 10C24.5 17 7.5 17 2 10Z"/>
+      <use href="#me-ball" x="10.5" y="4.5" width="11" height="11"/>
+    </symbol>
+    <symbol id="me-league" viewBox="0 0 48 48">
+      <circle class="lc-ring" cx="24" cy="24" r="22.5"/>
+      <circle class="lc-disc" cx="24" cy="24" r="19.5"/>
+      <polygon class="lc-star" points="24,11 25.18,14.38 28.76,14.45 25.90,16.62 26.94,20.05 24,18 21.06,20.05 22.10,16.62 19.24,14.45 22.82,14.38"/>
+      <path class="lc-wave" d="M9.5 27C14 23.6 19 30.4 24 27S34 23.6 38.5 27V30.4C34 27 29 33.8 24 30.4S14 27 9.5 30.4Z"/>
+      <path class="lc-wave lc-wave-2" d="M11.5 33.2C15.5 30.2 19.8 36.2 24 33.2S32.5 30.2 36.5 33.2V35.8C32.5 32.8 28.2 38.8 24 35.8S15.5 32.8 11.5 35.8Z"/>
+    </symbol>
+    <symbol id="me-crest" viewBox="0 0 40 46">
+      <path class="cr-rim" d="M20 1L38.5 6V22C38.5 34 30.5 41.2 20 45.2C9.5 41.2 1.5 34 1.5 22V6Z"/>
+      <path class="cr-field" d="M20 3.7L35.8 7.9V22C35.8 32.4 28.9 38.7 20 42.3C11.1 38.7 4.2 32.4 4.2 22V7.9Z"/>
+      <path class="cr-band" d="M4.2 7.9L20 3.7L35.8 7.9V12.6H4.2Z"/>
+      <path class="cr-chevron" d="M5.6 29.2L20 36.4L34.4 29.2V32.6L20 39.8L5.6 32.6Z"/>
+    </symbol>
+  </svg>
   <a class="skip" href="#story-heading">Skip to the Match Story</a>
 
   <header class="topbar">
-    <p class="brand"><span class="wordmark">MatchEyes</span><span class="tagline">See beyond the score</span></p>
+    <p class="brand">
+      <svg class="brand-mark" viewBox="0 0 32 20" aria-hidden="true" focusable="false"><use href="#me-mark"/></svg>
+      <span class="wordmark">MatchEyes</span><span class="tagline">See beyond the score</span>
+    </p>
     <p id="provenance" class="provenance"></p>
+    <fieldset class="segmented theme-switch">
+      <legend class="sr-only">Colour theme</legend>
+      <div class="options">
+        <label><input type="radio" name="theme" value="dark" autocomplete="off" checked><span>Dark</span></label>
+        <label><input type="radio" name="theme" value="light" autocomplete="off"><span>Light</span></label>
+        <label><input type="radio" name="theme" value="system" autocomplete="off"><span>System</span></label>
+      </div>
+    </fieldset>
     <a id="about-link" class="about-link" href="#about">About this replay</a>
   </header>
 
   <section class="hero" aria-labelledby="match-title">
     <h1 id="match-title" class="sr-only">MatchEyes match replay</h1>
-    <p id="meta" class="hero-meta"></p>
+    <div class="competition">
+      <svg class="league-crest" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><use href="#me-league"/></svg>
+      <p id="meta" class="hero-meta"></p>
+    </div>
     <div class="scoreline">
       <div class="team home">
-        <span id="home-crest" class="crest" aria-hidden="true"></span>
+        <span id="home-crest" class="crest side-home" aria-hidden="true">
+          <svg class="crest-art" viewBox="0 0 40 46" focusable="false"><use href="#me-crest"/></svg>
+          <span class="crest-mono"></span>
+        </span>
         <span id="home" class="team-name"></span>
         <span id="home-short" class="team-short" aria-hidden="true"></span>
       </div>
@@ -28,7 +79,10 @@
         <span id="home-score">-</span><span class="score-sep">:</span><span id="away-score">-</span>
       </p>
       <div class="team away">
-        <span id="away-crest" class="crest away" aria-hidden="true"></span>
+        <span id="away-crest" class="crest side-away" aria-hidden="true">
+          <svg class="crest-art" viewBox="0 0 40 46" focusable="false"><use href="#me-crest"/></svg>
+          <span class="crest-mono"></span>
+        </span>
         <span id="away" class="team-name"></span>
         <span id="away-short" class="team-short" aria-hidden="true"></span>
       </div>
@@ -61,6 +115,12 @@
       <span class="field-label">Favourite club</span>
       <select id="club"><option value="">None</option></select>
     </label>
+    <div class="field">
+      <span class="field-label" aria-hidden="true">Updates</span>
+      <button id="hold" class="text-button hold-button" type="button" aria-describedby="hold-status"
+        aria-disabled="true">Pause updates</button>
+    </div>
+    <p id="hold-status" class="hold-status" hidden></p>
   </form>
 
   <div id="connection" class="connection" hidden>
@@ -71,25 +131,47 @@
   <section id="chart" class="chart" aria-labelledby="chart-heading">
     <div class="chart-head">
       <h2 id="chart-heading" tabindex="-1">Match at a glance</h2>
-      <p class="chart-note">Marks sit at snapshot time: the close of the match minute in which each
-        event was recorded, not the exact moment it happened. The analysis lane shows when insights
-        were published, revised or retracted; it is not linked to match events.</p>
+      <p class="chart-note">Events sit on time rails, home above the pitch and away below, at
+        snapshot time: the close of the match minute in which each event was recorded, not the exact
+        moment it happened. The analysis lane shows when insights were published, revised or
+        retracted; it is not linked to match events.</p>
     </div>
     <p id="chart-gap" class="chart-gap" hidden></p>
     <div id="chart-frame" class="chart-frame">
-      <svg id="chart-svg" class="chart-svg" viewBox="0 0 1000 258" role="group"
+      <svg id="chart-svg" class="chart-svg" viewBox="0 0 1000 470" role="group"
         aria-labelledby="chart-heading" aria-describedby="chart-help">
+        <defs>
+          <radialGradient id="pitch-light" cx="0.5" cy="0" r="0.8">
+            <stop class="pl-in" offset="0"/>
+            <stop class="pl-out" offset="1"/>
+          </radialGradient>
+          <radialGradient id="pitch-edge" cx="0.5" cy="0.5" r="0.72">
+            <stop class="pe-in" offset="0.6"/>
+            <stop class="pe-out" offset="1"/>
+          </radialGradient>
+        </defs>
         <g id="chart-axis" aria-hidden="true"></g>
+        <g id="chart-pitch" aria-hidden="true"></g>
+        <g id="chart-track" aria-hidden="true"></g>
+        <g id="chart-ball" class="c-ball" aria-hidden="true" display="none">
+          <circle class="c-ball-glow" r="13"/>
+          <use href="#me-ball" x="-9" y="-9" width="18" height="18"/>
+        </g>
         <g id="chart-score" aria-hidden="true"></g>
         <g id="chart-notes" aria-hidden="true"></g>
         <g id="chart-events"></g>
       </svg>
     </div>
-    <p id="chart-help" class="sr-only">Match events are buttons in time order, home team above the
-      line and away team below. Use the arrow keys to move between them, Home and End for the first
-      and last, and Enter to open the event in the match timeline. The score and analysis lanes are
-      also listed in the match timeline.</p>
+    <div class="pitch-caption">
+      <p id="chart-position" class="chart-position">The timeline position appears when the replay starts.</p>
+    </div>
+    <p id="chart-help" class="sr-only">Match events are buttons in time order, home team on the
+      time rail above the pitch and away team on the rail below. Use the arrow keys to move between
+      them, Home and End for the first and last, and Enter to open the event in the match timeline.
+      Selecting an event moves the timeline position to it. The score and analysis lanes are also
+      listed in the match timeline.</p>
     <ul class="chart-legend" aria-hidden="true">
+      <li><svg class="lg-ball" viewBox="0 0 24 24" focusable="false"><use href="#me-ball"/></svg>Timeline position</li>
       <li><span class="lg lg-goal"></span>Goal</li>
       <li><span class="lg lg-red"></span>Red card</li>
       <li><span class="lg lg-sub"></span>Substitution</li>
@@ -103,6 +185,34 @@
     <div id="chart-readout" class="chart-readout">
       <p class="quiet">Select an event on the chart to see its details.</p>
     </div>
+  </section>
+
+  <section id="stats" class="stats" aria-labelledby="stats-heading">
+    <div class="chart-head">
+      <h2 id="stats-heading" tabindex="-1">Team statistics</h2>
+      <p class="chart-note">Counts, shares and ratios from the match event data, recalculated at
+        each snapshot. They are context only and are not linked to match events or insights.</p>
+    </div>
+    <div class="stats-anchor">
+      <p id="stats-anchor">Team statistics appear here from the first snapshot of the replay.</p>
+      <button id="stats-latest" class="link-button" type="button" hidden>Show the latest statistics</button>
+    </div>
+    <p id="stats-status" class="stats-status" hidden></p>
+    <p id="stats-key" class="stats-key" aria-hidden="true" hidden>
+      <span class="sk sk-home"></span><span id="stats-key-home">Home</span><span class="sk-where">left</span>
+      <span class="sk sk-away"></span><span id="stats-key-away">Away</span><span class="sk-where">right</span>
+    </p>
+    <table id="stats-table" class="stats-table" role="table" aria-labelledby="stats-heading"
+      aria-describedby="stats-anchor" hidden>
+      <thead class="stats-head" role="rowgroup">
+        <tr role="row">
+          <th role="columnheader" scope="col">Statistic</th>
+          <th id="stats-col-home" role="columnheader" scope="col">Home</th>
+          <th id="stats-col-away" role="columnheader" scope="col">Away</th>
+        </tr>
+      </thead>
+      <tbody id="stats-rows" class="stats-rows" role="rowgroup"></tbody>
+    </table>
   </section>
 
   <main class="layout">

@@ -52,7 +52,10 @@ const REPLAY_TEXT = {
   reconnecting: "Reconnecting",
   complete: "Replay complete",
   unavailable: "Unavailable",
+  paused: "Paused",
+  reloading: "Reloading",
 };
+const PAUSABLE = new Set(["replaying", "reconnecting", "complete"]);
 const CATCH_UP_GAP_MS = 400;
 
 let source = null;
@@ -60,6 +63,7 @@ let edition = null;
 let started = false;
 let ended = false;
 let replay = "connecting";
+let replayDetail = "";
 let catchingUp = true; // messages that arrive in one burst after (re)connecting are history
 let lastArrival = 0;
 let matches = [];
@@ -121,14 +125,26 @@ function scoreText(score) {
 
 function setReplay(next, detail) {
   replay = next;
+  replayDetail = detail || "";
+  renderReplay();
+}
+
+// The replay state shows the connection first: a paused page that has lost its stream says so.
+function renderReplay() {
+  const shown = held && replay !== "reconnecting" && replay !== "unavailable" ? "paused" : replay;
   const node = $("replay-state");
-  node.className = "replay-state r-" + next;
-  node.textContent = REPLAY_TEXT[next];
+  node.className = "replay-state r-" + shown;
+  node.textContent = REPLAY_TEXT[shown];
   const banner = $("connection");
-  banner.hidden = !(next === "reconnecting" || next === "unavailable");
-  banner.className = "connection c-" + next;
-  $("connection-text").textContent = detail || "";
-  $("retry").hidden = next !== "unavailable";
+  banner.hidden = !(replay === "reconnecting" || replay === "unavailable");
+  banner.className = "connection c-" + replay;
+  $("connection-text").textContent = replayDetail;
+  $("retry").hidden = replay !== "unavailable";
+  const button = $("hold");
+  button.textContent = held ? "Resume updates" : "Pause updates";
+  button.setAttribute("aria-disabled", held || canPause() ? "false" : "true");
+  $("hold-status").textContent = held ? holdText(held) : "";
+  $("hold-status").hidden = !held;
   refreshEmpty();
 }
 
@@ -166,7 +182,12 @@ function renderPhase() {
 }
 
 function crest(node, team) {
-  node.textContent = team.short_name;
+  node.querySelector(".crest-mono").textContent = team.short_name;
+}
+
+// The choice lasts for this page only: nothing is stored, so a reload returns to dark.
+function setTheme() {
+  document.documentElement.dataset.theme = document.querySelector("input[name=theme]:checked").value;
 }
 
 function teamShort(teamId) {
@@ -561,14 +582,24 @@ function onMoment(cue, at, live) {
 }
 
 // --- match at a glance -------------------------------------------------------------------------
-// An SVG overview of the replay so far. Every mark sits at the clock tick of the snapshot that
-// carried its cue (snapshot time, not event time); the score lines are the moment cues' scores.
+// An SVG overview of the replay so far, drawn around a top-down pitch. Every mark sits on a time
+// rail at the clock tick of the snapshot that carried its cue (snapshot time, not event time):
+// home events on the rail above the pitch, away events on the rail below. Each half fills its
+// half of the pitch's length. The ball travels along the middle of the pitch to the timeline
+// position (the replay clock or the selected event); it is never a tracked position. The score
+// lines are the moment cues' scores.
 
 const HALF_MS = 45 * 60000;
 const CHART = {
-  height: 258, left: 68, right: 16, gap: 14, top: 24, axis: 80, row: 18, bottom: 140,
-  ticks: 154, scoreTop: 172, scoreBase: 204, notes: 224, noteRow: 11, end: 250,
+  left: 68, right: 16, gap: 14, period: 32, railTop: 44, homeRow: 88, row: 16, pitchTop: 114,
+  apron: 8, runoff: 10, awayRail: 62, noteRow: 11, stripes: 12,
 };
+// Pitch markings in metres, drawn to scale across a pitch 68 m wide.
+const PITCH = {
+  width: 68, box: 16.5, boxWidth: 40.32, six: 5.5, sixWidth: 18.32, spot: 11, arc: 9.15,
+  goal: 7.32, goalDepth: 2.44, corner: 1, spotRadius: 0.3,
+};
+const BALL_TURN = 360 / (2 * Math.PI * 9); // degrees per unit rolled by the 9-unit ball
 const HALF_CLOSE = { 1: "HT", 2: "FT" };
 const NOTE_KIND = { insight: "published", revision: "revised", retraction: "retracted" };
 const READOUT_EMPTY = "Select an event on the chart to see its details.";
@@ -584,6 +615,8 @@ let rove = null; // the mark that holds the chart's tab stop
 let picked = null;
 let gapSeen = false;
 let chartWidth = 1000;
+let G = {}; // vertical layout below the pitch, which grows with the chart's width
+let pitchDrawn = ""; // the geometry the pitch was last drawn for
 
 function svgEl(tag, cls, attrs) {
   const node = document.createElementNS(SVG_NS, tag);
@@ -599,15 +632,30 @@ function svgText(cls, x, y, text, anchor) {
   return node;
 }
 
+function svgLine(cls, x1, y1, x2, y2) {
+  return svgEl("line", cls, { x1: x1.toFixed(1), y1, x2: x2.toFixed(1), y2 });
+}
+
 function snapshotTime(cue) {
   return snapshotAt.get(cue.snapshot_id) || now.slice();
 }
 
 function chartX(at) {
-  const span = chartWidth - CHART.left - CHART.right - CHART.gap;
-  const scale = span / (halfEnd[1] + halfEnd[2]);
-  const offset = at[0] === 2 ? halfEnd[1] * scale + CHART.gap : 0;
-  return CHART.left + offset + at[1] * scale;
+  const half = (chartWidth - CHART.left - CHART.right - CHART.gap) / 2;
+  const p = at[0] === 2 ? 2 : 1;
+  return CHART.left + (p === 2 ? half + CHART.gap : 0) + at[1] * half / halfEnd[p];
+}
+
+function measure() {
+  const length = chartWidth - CHART.left - CHART.right;
+  const pitch = Math.round(Math.min(200, Math.max(84, length * 0.26)));
+  const axis = CHART.pitchTop + pitch + CHART.apron + 18;
+  const awayTop = axis + 30;
+  const scoreTop = awayTop + CHART.awayRail + 22;
+  const scoreBase = scoreTop + 30;
+  const notes = scoreBase + 24;
+  G = { pitch, axis, awayTop, awayRow: awayTop + 14, scoreTop, scoreBase, notes, end: notes + 28 };
+  G.height = G.end + 4;
 }
 
 function teamName(teamId) {
@@ -618,47 +666,157 @@ function teamName(teamId) {
 }
 
 function drawAxis() {
-  const axis = $("chart-axis");
   const out = [];
-  const line = (cls, x1, y1, x2, y2) =>
-    svgEl("line", cls, { x1: x1.toFixed(1), y1, x2: x2.toFixed(1), y2 });
+  const left = CHART.left;
+  const right = chartWidth - CHART.right;
+  const rail = (y, height) => svgEl("rect", "c-rail", {
+    x: left - CHART.runoff, y, width: (right - left + 2 * CHART.runoff).toFixed(1), height, rx: 6,
+  });
+  const homeBottom = CHART.pitchTop - CHART.apron - 6;
+  out.push(rail(CHART.railTop, homeBottom - CHART.railTop), rail(G.awayTop, CHART.awayRail));
+  out.push(svgLine("c-rail-line", left, CHART.homeRow, right, CHART.homeRow));
+  out.push(svgLine("c-rail-line", left, G.awayRow, right, G.awayRow));
   for (const half of [1, 2]) {
     const start = chartX([half, 0]);
     const close = chartX([half, halfEnd[half]]);
     if (halfEnd[half] > HALF_MS) {
       const from = chartX([half, HALF_MS]);
       out.push(svgEl("rect", "c-stoppage", {
-        x: from.toFixed(1), y: CHART.top, width: (close - from).toFixed(1),
-        height: CHART.bottom - CHART.top,
+        x: from.toFixed(1), y: CHART.railTop, width: (close - from).toFixed(1),
+        height: G.end - CHART.railTop,
       }));
-      if (close - from > 56) out.push(svgText("c-small", from + 3, CHART.top - 4, "Stoppage"));
+      if (close - from > 56) out.push(svgText("c-small", from + 3, CHART.railTop - 4, "Stoppage"));
     }
     out.push(svgText("c-half", start, 12, PERIOD_LABEL[half]));
     for (let m = half === 1 ? 0 : 15; m <= 45; m += 15) {
       const x = chartX([half, m * 60000]);
-      out.push(line("c-grid", x, CHART.top, x, CHART.end));
-      out.push(svgText("c-tick", x, CHART.ticks, (half === 1 ? m : 45 + m) + "'", "middle"));
+      out.push(svgLine("c-grid", x, CHART.railTop, x, G.end));
     }
-    out.push(line("c-axis", start, CHART.axis, close, CHART.axis));
   }
-  out.push(line("c-band", CHART.left, CHART.ticks + 6, chartWidth - CHART.right, CHART.ticks + 6));
-  out.push(line("c-band", CHART.left, CHART.scoreBase + 8, chartWidth - CHART.right,
-    CHART.scoreBase + 8));
+  out.push(svgLine("c-band", left, G.scoreBase + 8, right, G.scoreBase + 8));
   if (snapshotAt.size) {
     const x = chartX(now);
-    out.push(line("c-now", x, CHART.top, x, CHART.end));
+    out.push(svgLine("c-now", x, CHART.railTop, x, G.end));
   }
   if (current) {
-    out.push(svgText("c-label", 0, CHART.axis - 24, current.home.short_name));
-    out.push(svgText("c-label", 0, CHART.axis + 32, current.away.short_name));
-    out.push(svgText("c-label", 0, CHART.scoreTop - 2, "Score"));
-    out.push(svgText("c-small", 0, CHART.scoreTop + 14, current.home.short_name));
-    out.push(line("c-key c-step-home", 30, CHART.scoreTop + 10, 54, CHART.scoreTop + 10));
-    out.push(svgText("c-small", 0, CHART.scoreTop + 28, current.away.short_name));
-    out.push(line("c-key c-step-away", 30, CHART.scoreTop + 24, 54, CHART.scoreTop + 24));
+    const chip = (side, y) => svgEl("rect", "c-chip side-" + side,
+      { x: 0, y: y - 6, width: 4, height: 12, rx: 1 });
+    out.push(chip("home", CHART.homeRow), svgText("c-label", 9, CHART.homeRow + 4,
+      current.home.short_name));
+    out.push(chip("away", G.awayRow), svgText("c-label", 9, G.awayRow + 4, current.away.short_name));
+    out.push(svgText("c-label", 0, G.scoreTop - 2, "Score"));
+    out.push(svgText("c-small", 0, G.scoreTop + 14, current.home.short_name));
+    out.push(svgLine("c-key c-step-home", 30, G.scoreTop + 10, 54, G.scoreTop + 10));
+    out.push(svgText("c-small", 0, G.scoreTop + 28, current.away.short_name));
+    out.push(svgLine("c-key c-step-away", 30, G.scoreTop + 24, 54, G.scoreTop + 24));
   }
-  out.push(svgText("c-label", 0, CHART.notes + 8, "Analysis"));
-  axis.replaceChildren(...out);
+  out.push(svgText("c-label", 0, G.notes + 8, "Analysis"));
+  $("chart-axis").replaceChildren(...out);
+}
+
+// The pitch is scenery: it depends only on the chart's size, so it is redrawn only on resize.
+function drawPitch() {
+  const left = CHART.left;
+  const right = chartWidth - CHART.right;
+  const top = CHART.pitchTop;
+  const h = G.pitch;
+  const drawn = left + " " + right + " " + h;
+  if (drawn === pitchDrawn) return;
+  pitchDrawn = drawn;
+  const f = (v) => v.toFixed(1);
+  const m = (metres) => metres * h / PITCH.width;
+  const mid = (left + right) / 2;
+  const cy = top + h / 2;
+  const turf = {
+    x: f(left - CHART.runoff), y: top - CHART.apron, width: f(right - left + 2 * CHART.runoff),
+    height: h + 2 * CHART.apron, rx: 6,
+  };
+  const out = [svgEl("rect", "p-turf", turf)];
+  const stripe = (right - left) / CHART.stripes;
+  for (let i = 1; i < CHART.stripes; i += 2) {
+    out.push(svgEl("rect", "p-stripe", {
+      x: f(left + i * stripe), y: turf.y, width: f(stripe), height: turf.height,
+    }));
+  }
+  out.push(svgEl("rect", "p-light", { ...turf, fill: "url(#pitch-light)" }));
+  out.push(svgEl("rect", "p-light", { ...turf, fill: "url(#pitch-edge)" }));
+  const lines = svgEl("g", "p-line");
+  lines.append(svgEl("rect", null, { x: f(left), y: top, width: f(right - left), height: h }),
+    svgLine(null, mid, top, mid, top + h),
+    svgEl("circle", null, { cx: f(mid), cy: f(cy), r: f(m(PITCH.arc)) }));
+  const spots = [mid];
+  const rise = Math.sqrt(PITCH.arc ** 2 - (PITCH.box - PITCH.spot) ** 2);
+  for (const [line, dir] of [[left, 1], [right, -1]]) {
+    const box = (depth, width) => svgEl("rect", null, {
+      x: f(dir > 0 ? line : line - m(depth)), y: f(cy - m(width) / 2), width: f(m(depth)),
+      height: f(m(width)),
+    });
+    const edge = f(line + dir * m(PITCH.box));
+    const r = f(m(PITCH.arc));
+    lines.append(box(PITCH.box, PITCH.boxWidth), box(PITCH.six, PITCH.sixWidth),
+      svgEl("path", null, {
+        d: "M" + edge + " " + f(cy - m(rise)) + " A" + r + " " + r + " 0 0 " + (dir > 0 ? 1 : 0) +
+          " " + edge + " " + f(cy + m(rise)),
+      }));
+    const corner = Math.max(2, m(PITCH.corner));
+    for (const [y, dy] of [[top, 1], [top + h, -1]]) {
+      lines.append(svgEl("path", null, {
+        d: "M" + f(line) + " " + f(y + dy * corner) + " A" + f(corner) + " " + f(corner) + " 0 0 " +
+          (dir * dy > 0 ? 0 : 1) + " " + f(line + dir * corner) + " " + f(y),
+      }));
+    }
+    spots.push(line + dir * m(PITCH.spot));
+    out.push(svgEl("rect", "p-goal", {
+      x: f(dir > 0 ? line - m(PITCH.goalDepth) : line), y: f(cy - m(PITCH.goal) / 2),
+      width: f(m(PITCH.goalDepth)), height: f(m(PITCH.goal)),
+    }));
+  }
+  out.push(lines);
+  for (const x of spots) {
+    out.push(svgEl("circle", "p-spot", { cx: f(x), cy: f(cy), r: f(Math.max(1.3, m(PITCH.spotRadius))) }));
+  }
+  $("chart-pitch").replaceChildren(...out);
+}
+
+function drawTrack() {
+  const out = [];
+  const y = G.axis;
+  for (const half of [1, 2]) {
+    const start = chartX([half, 0]);
+    const close = chartX([half, halfEnd[half]]);
+    out.push(svgLine("c-track", start, y, close, y));
+    if (snapshotAt.size && now[0] >= half) {
+      const end = now[0] > half ? close : chartX(now);
+      if (end > start) out.push(svgLine("c-track-played", start, y, end, y));
+    }
+    for (let m = half === 1 ? 0 : 15; m <= 45; m += 15) {
+      const x = chartX([half, m * 60000]);
+      out.push(svgLine("c-track-tick", x, y - 5, x, y + 5));
+      out.push(svgText("c-tick", x, y + 23, (half === 1 ? m : 45 + m) + "'", "middle"));
+    }
+  }
+  $("chart-track").replaceChildren(...out);
+}
+
+// The ball shows the timeline position: the selected event if there is one, else the replay clock.
+function placeBall() {
+  const ball = $("chart-ball");
+  const position = $("chart-position");
+  ball.setAttribute("class", picked ? "c-ball held" : "c-ball");
+  if (!snapshotAt.size) {
+    ball.setAttribute("display", "none");
+    position.textContent = "The timeline position appears when the replay starts.";
+    return;
+  }
+  const x = chartX(picked ? picked.at : now);
+  ball.removeAttribute("display");
+  ball.setAttribute("transform", "translate(" + x.toFixed(1) + " " +
+    (CHART.pitchTop + G.pitch / 2) + ") rotate(" +
+    (x * BALL_TURN).toFixed(1) + ")");
+  position.textContent = picked
+    ? "Timeline position: " + picked.minute + ", the selected event. Replay clock: " +
+      (minute || DASH) + "."
+    : "Timeline position: " + (minute || DASH) + ", the replay clock.";
 }
 
 function drawScore() {
@@ -666,7 +824,7 @@ function drawScore() {
   if (scores.length) {
     let top = 1;
     for (const p of scores) top = Math.max(top, p.score.home, p.score.away);
-    const y = (goals) => CHART.scoreBase - goals * (CHART.scoreBase - CHART.scoreTop) / top;
+    const y = (goals) => G.scoreBase - goals * (G.scoreBase - G.scoreTop) / top;
     const end = chartX(now);
     for (const side of ["home", "away"]) {
       const lift = side === "away" ? 2 : 0;
@@ -692,27 +850,31 @@ function drawScore() {
 
 function layoutChart() {
   chartWidth = Math.max(280, Math.round($("chart-frame").clientWidth || 1000));
-  $("chart-svg").setAttribute("viewBox", "0 0 " + chartWidth + " " + CHART.height);
+  measure();
+  $("chart-svg").setAttribute("viewBox", "0 0 " + chartWidth + " " + G.height);
   drawAxis();
+  drawPitch();
+  drawTrack();
   const rows = { "-1": [], "1": [] }; // per side, the x of the last mark in each row
   for (const m of marks) {
     const x = chartX(m.at);
-    let y = CHART.axis;
+    let y = CHART.period;
     if (m.side) {
       const taken = rows[m.side];
       let row = taken.findIndex((last) => x - last >= 14);
       if (row < 0 && taken.length < 3) row = taken.length;
       if (row < 0) row = taken.indexOf(Math.min(...taken));
       taken[row] = x;
-      y = CHART.axis + m.side * CHART.row * (row + 1);
+      y = m.side < 0 ? CHART.homeRow - CHART.row * row : G.awayRow + CHART.row * row;
     }
     m.node.setAttribute("transform", "translate(" + x.toFixed(1) + " " + y + ")");
   }
   for (const n of notes) {
-    const y = CHART.notes + n.row * CHART.noteRow;
+    const y = G.notes + n.row * CHART.noteRow;
     n.node.setAttribute("transform", "translate(" + chartX(n.at).toFixed(1) + " " + y + ")");
   }
   drawScore();
+  placeBall();
 }
 
 function markShape(node, kind, half) {
@@ -724,13 +886,11 @@ function markShape(node, kind, half) {
     node.append(svgEl("path", "mk-on", { d: "M-6 -1 L-3 -7 L0 -1 Z" }),
       svgEl("path", "mk-off", { d: "M0 1 L3 7 L6 1 Z" }));
   } else {
-    node.append(svgEl("line", "mk-rule", { x1: 0, y1: CHART.top - CHART.axis, x2: 0,
-      y2: CHART.bottom - CHART.axis }));
+    node.append(svgEl("line", "mk-rule", { x1: 0, y1: 6, x2: 0,
+      y2: CHART.pitchTop - CHART.apron - 6 - CHART.period }));
     node.append(svgEl("rect", "mk-diamond", { x: -4, y: -4, width: 8, height: 8,
       transform: "rotate(45)" }));
-    if (kind === "period_end") {
-      node.append(svgText("mk-minute", 0, CHART.top - CHART.axis - 4, HALF_CLOSE[half], "middle"));
-    }
+    if (kind === "period_end") node.append(svgText("mk-minute", 0, -9, HALF_CLOSE[half], "middle"));
   }
 }
 
@@ -761,6 +921,8 @@ function unpick() {
   picked = null;
   keepFocus($("chart-readout"));
   $("chart-readout").replaceChildren(el("p", "quiet", READOUT_EMPTY));
+  placeBall();
+  renderStats();
 }
 
 function pick(mark, fromChart) {
@@ -770,6 +932,8 @@ function pick(mark, fromChart) {
     mark.node.classList.add("picked");
     mark.node.setAttribute("aria-current", "true");
     showReadout(mark);
+    placeBall();
+    renderStats();
   }
   if (fromChart) {
     document.querySelector("input[name=lane][value=moments]").checked = true;
@@ -816,7 +980,8 @@ function chartMoment(cue, at, src, li) {
   const statement = cue.sections.filter((s) => s.kind === "moment").map((s) => s.text).join(" ");
   const time = snapshotTime(cue);
   const mark = {
-    at: time, side: away ? 1 : home ? -1 : 0, minute: at, headline: headline ? headline.text : "",
+    at: time, snapshot: cue.snapshot_id, side: away ? 1 : home ? -1 : 0, minute: at,
+    headline: headline ? headline.text : "",
     statement, team: src.team_id, score: src.score, li, details: li.querySelector("details"),
     node: svgEl("g", "mk mk-" + src.moment, { tabindex: -1, role: "button" }),
   };
@@ -913,6 +1078,247 @@ function chartReset() {
   $("chart-gap").hidden = true;
   $("chart-readout").replaceChildren(el("p", "quiet", READOUT_EMPTY));
   layoutChart();
+}
+
+// --- team statistics: one server-formatted message per snapshot; values only size the bars ----
+
+const STATS_VERSION = "0.1.0";
+// The measures shown, in order, and how each bar compares the two teams: "split" divides one bar
+// between them, "mirror" grows each team's share out from the centre, "" draws no bar.
+const STAT_BARS = {
+  shots: "split", on_ball_share: "split", field_tilt: "split", pass_completion: "mirror",
+  progressive_actions: "split", high_regains: "split", pressures: "split", ppda: "",
+};
+const STAT_KEYS = Object.keys(STAT_BARS);
+const STAT_UNITS = { count: "Count", share: "Share", ratio: "Ratio" };
+const STAT_STATES = new Set(["valid", "invalid", "unavailable"]);
+const FIGURE_STATES = new Set(["ok", "insufficient_sample"]);
+const STATS_NOT_CARRIED = "Values from earlier minutes are not carried forward.";
+const STATS_LEVEL = {
+  missing: "missing", stale: "stale", invalid: "unavailable", unavailable: "unavailable",
+  unreadable: "unavailable",
+};
+
+let statsAt = new Map(); // snapshot_id -> statistics message of this edition
+let statsLatest = null;
+let statsTick = null; // snapshot_id of the latest clock tick
+let statsBehind = false; // a clock tick passed without the statistics of its snapshot
+let statsLastValid = ""; // minute of the latest snapshot with values
+let statsAnnounced = "none"; // the state of the latest statistics last announced
+
+function statsReadable(stats) {
+  return stats.stats_version === STATS_VERSION && typeof stats.minute === "string" &&
+    STAT_STATES.has(stats.status);
+}
+
+function figureOf(teamStats, key) {
+  const values = teamStats.values;
+  if (!values || typeof values !== "object" || !Object.hasOwn(values, key)) return null;
+  const figure = values[key];
+  if (!figure || typeof figure.display !== "string") return null;
+  return FIGURE_STATES.has(figure.status) ? figure : null;
+}
+
+// The rows of a valid message, or null if it cannot be shown as it stands.
+function statsRows(stats) {
+  if (!current || !Array.isArray(stats.measures) || !Array.isArray(stats.teams)) return null;
+  if (stats.teams.length !== 2) return null;
+  const find = (team) =>
+    stats.teams.find((teamStats) => teamStats && teamStats.team_id === team.team_id);
+  const home = find(current.home);
+  const away = find(current.away);
+  if (!home || !away || home === away) return null;
+  const rows = [];
+  for (const key of STAT_KEYS) {
+    const measure = stats.measures.find((measure) => measure && measure.key === key);
+    if (!measure || typeof measure.label !== "string" || !STAT_UNITS[measure.unit]) return null;
+    rows.push({ key, measure, home: figureOf(home, key), away: figureOf(away, key) });
+  }
+  return rows;
+}
+
+function barValue(figure) {
+  if (!figure || figure.status !== "ok" || typeof figure.value !== "number") return null;
+  return Number.isFinite(figure.value) && figure.value >= 0 ? figure.value : null;
+}
+
+function statsBar(row) {
+  const kind = STAT_BARS[row.key];
+  if (!kind) return null;
+  const bar = svgEl("svg", "st-bar", {
+    viewBox: "0 0 200 8", preserveAspectRatio: "none", "aria-hidden": "true", focusable: "false",
+  });
+  bar.append(svgEl("rect", "st-track", { x: 0, y: 0, width: 200, height: 8, rx: 4 }));
+  const home = barValue(row.home);
+  const away = barValue(row.away);
+  let parts = null;
+  let divide = 100;
+  if (home !== null && away !== null) {
+    if (kind === "split" && home + away > 0) {
+      divide = (200 * home) / (home + away);
+      parts = [[0, divide], [divide, 200 - divide]];
+    } else if (kind === "mirror") {
+      const h = 100 * Math.min(home, 1);
+      parts = [[100 - h, h], [100, 100 * Math.min(away, 1)]];
+    }
+  }
+  for (const [i, side] of (parts ? ["home", "away"] : []).entries()) {
+    const [x, width] = parts[i];
+    const attrs = { x: x.toFixed(2), y: 0, width: width.toFixed(2), height: 8 };
+    bar.append(svgEl("rect", "st-fill-" + side, attrs));
+  }
+  if (parts || kind === "mirror") bar.append(svgLine("st-mid", divide, 0, divide, 8));
+  return bar;
+}
+
+function statsCell(figure, measure, side) {
+  const cell = el("td", "st-value st-" + side);
+  cell.setAttribute("role", "cell");
+  if (!figure) {
+    cell.append(el("span", "st-figure st-short", "Not available"));
+    return cell;
+  }
+  const ok = figure.status === "ok";
+  cell.append(el("span", ok ? "st-figure" : "st-figure st-short", figure.display));
+  if (typeof measure.sample_of === "string" && Number.isInteger(figure.sample)) {
+    let text = "of " + figure.sample;
+    if (!ok) {
+      text = "Sample " + figure.sample;
+      if (Number.isInteger(measure.min_sample)) text += ", needs " + measure.min_sample;
+    }
+    cell.append(el("span", "st-sample", text));
+  }
+  return cell;
+}
+
+function statsRow(row) {
+  const measure = row.measure;
+  const tr = el("tr", "st-row");
+  tr.setAttribute("role", "row");
+  const head = el("th", "st-label");
+  head.scope = "row";
+  head.setAttribute("role", "rowheader");
+  const unit = STAT_UNITS[measure.unit];
+  head.setAttribute("aria-label", measure.label + ", " + unit.toLowerCase());
+  const name = el("span", "st-name");
+  name.append(el("span", null, measure.label), el("span", "st-unit", unit));
+  head.append(name);
+  const bar = statsBar(row);
+  if (bar) head.append(bar);
+  const notes = [];
+  if (typeof measure.note === "string") notes.push(measure.note);
+  if (typeof measure.sample_of === "string") notes.push("Sample: " + measure.sample_of + ".");
+  if (notes.length) {
+    const note = el("span", "st-note", notes.join(" "));
+    note.id = "st-note-" + row.key;
+    head.setAttribute("aria-describedby", note.id);
+    head.append(note);
+  }
+  tr.append(head, statsCell(row.home, measure, "home"), statsCell(row.away, measure, "away"));
+  return tr;
+}
+
+function statsNotice(stats, latest) {
+  const tail = latest && statsLastValid ? " The last statistics were for " + statsLastValid + "." : "";
+  if (!statsReadable(stats)) return "Team statistics for this minute could not be read." + tail;
+  if (stats.status === "invalid") {
+    return "No team statistics for " + stats.minute + ": the match data for this minute did not " +
+      "pass its consistency checks." + tail;
+  }
+  if (stats.status === "unavailable") {
+    return "Team statistics for " + stats.minute + " could not be calculated." + tail;
+  }
+  return "Team statistics for " + stats.minute + " could not be read." + tail;
+}
+
+// The state of the statistics shown: "none" before any, "valid", "stale", "missing", "invalid",
+// "unavailable" or "unreadable".
+function statsState(stats, rows, latest, behind) {
+  if (!stats) return latest && !behind ? "none" : "missing";
+  if (rows) return latest && behind ? "stale" : "valid";
+  if (!statsReadable(stats) || stats.status === "valid") return "unreadable";
+  return stats.status;
+}
+
+// What a screen reader hears when the latest statistics change state: the visible notice, or
+// nothing when the state is unchanged.
+function statsAnnouncement(before, after, notice) {
+  if (after === before || after === "none") return "";
+  if (after !== "valid") return notice;
+  if (before === "none") return "";
+  return before === "stale" ? "Team statistics are up to date again." :
+    "Team statistics are available again.";
+}
+
+function renderStats() {
+  const latest = !picked;
+  const stats = latest ? statsLatest : statsAt.get(picked.snapshot);
+  const rows = stats && statsReadable(stats) && stats.status === "valid" ? statsRows(stats) : null;
+  const state = statsState(stats, rows, latest, statsBehind);
+  let anchor = "Team statistics appear here from the first snapshot of the replay.";
+  let notice = "";
+  if (stats && statsReadable(stats)) {
+    const half = PERIOD_LABEL[stats.period];
+    anchor = "As of " + stats.minute + (half ? ", " + half.toLowerCase() : "") +
+      (latest ? ", the latest snapshot." : ", the snapshot of the selected event.");
+  } else if (!latest) {
+    anchor = "The selected event is at " + picked.minute + ".";
+  } else if (stats) {
+    anchor = "The latest snapshot.";
+  }
+  if (state === "missing") {
+    notice = latest ? "No team statistics have been received for this replay yet." :
+      "No team statistics were received for the selected event's minute.";
+  } else if (state === "stale") {
+    notice = "These statistics have not been updated since " + stats.minute + ".";
+  } else if (state !== "valid" && state !== "none") {
+    notice = statsNotice(stats, latest) + " " + STATS_NOT_CARRIED;
+  }
+  $("stats-anchor").textContent = anchor;
+  $("stats-latest").hidden = latest;
+  const status = $("stats-status");
+  const level = STATS_LEVEL[state];
+  status.textContent = notice;
+  status.className = "stats-status" + (level ? " s-" + level : "");
+  status.hidden = !notice;
+  $("stats-key").hidden = !rows;
+  $("stats-table").hidden = !rows;
+  $("stats-rows").replaceChildren(...(rows || []).map(statsRow));
+  if (!latest) return;
+  const heard = statsAnnouncement(statsAnnounced, state, notice);
+  if (heard && !catchingUp) announce(heard);
+  statsAnnounced = state;
+}
+
+function onStats(stats) {
+  if (!stats || typeof stats !== "object" || stats.edition !== edition) return;
+  if (typeof stats.snapshot_id !== "string") return;
+  statsAt.set(stats.snapshot_id, stats);
+  statsLatest = stats;
+  if (stats.snapshot_id === statsTick) statsBehind = false;
+  if (statsReadable(stats) && stats.status === "valid" && statsRows(stats)) {
+    statsLastValid = stats.minute;
+  }
+  renderStats();
+}
+
+function statsClock(tick) {
+  if (statsTick !== null && statsTick !== tick.snapshot_id && !statsAt.has(statsTick)) {
+    statsBehind = true;
+  }
+  statsTick = tick.snapshot_id;
+  renderStats();
+}
+
+function statsReset() {
+  if ($("stats").contains(document.activeElement)) $("stats-heading").focus();
+  statsAt = new Map();
+  statsLatest = null;
+  statsTick = null;
+  statsBehind = false;
+  statsLastValid = "";
+  statsAnnounced = "none";
+  renderStats();
 }
 
 // --- cues ----------------------------------------------------------------------------------
@@ -1012,6 +1418,153 @@ function onClock(tick) {
   });
   refreshEmpty();
   chartClock(tick);
+  statsClock(tick);
+}
+
+// --- pause and resume: received messages are held, then applied in order ----------------------
+
+// A full edition measured at most 296 messages and 400,988 UTF-16 code units of data.
+const HOLD_MAX_MESSAGES = 5000;
+const HOLD_MAX_UNITS = 4000000;
+const HELD_ANALYSIS = new Set(["insight", "revision", "retraction"]);
+
+let held = null; // while paused: the hold of received messages
+let reloading = false; // a new stream is reloading the edition after a hold overflowed
+let frozenAt = ""; // the minute shown when the overflowed hold was paused
+
+function newHold(editionNumber, isEnded, at) {
+  return {
+    items: [], units: 0, edition: editionNumber, ended: isEnded, at, moments: 0, analysis: 0,
+    restarted: false, finished: false, overflow: false,
+  };
+}
+
+// The field as the handler reads it, or null where the handler fails before reading it.
+function parsedField(data, name) {
+  try {
+    const value = JSON.parse(data);
+    return value === null ? null : { value: value[name] };
+  } catch {
+    return null;
+  }
+}
+
+// Adds a received message to a hold. Dropped are only messages that applying could not change:
+// everything before a new edition (whose arrival resets the page), an edition event for the
+// edition already reached, and an end after an end of the same edition. An edition event the
+// handler cannot read changes nothing when applied, so it is kept as it is.
+function holdMessage(hold, type, data) {
+  if (hold.overflow) return hold;
+  if (type === "edition") {
+    const number = parsedField(data, "edition");
+    if (number && number.value === hold.edition) return hold;
+    if (number) {
+      Object.assign(hold, { items: [], units: 0, moments: 0, analysis: 0, finished: false });
+      Object.assign(hold, { edition: number.value, ended: false, restarted: true });
+    }
+  } else if (type === "end") {
+    if (hold.ended) return hold;
+    Object.assign(hold, { ended: true, finished: true });
+  } else if (type === "cue") {
+    const kind = parsedField(data, "kind");
+    if (kind && kind.value === "moment") hold.moments += 1;
+    else if (kind && HELD_ANALYSIS.has(kind.value)) hold.analysis += 1;
+  }
+  hold.items.push([type, data]);
+  hold.units += data.length;
+  if (hold.items.length > HOLD_MAX_MESSAGES || hold.units > HOLD_MAX_UNITS) {
+    Object.assign(hold, { items: [], units: 0, overflow: true });
+  }
+  return hold;
+}
+
+function counted(n, one, many) {
+  return n + " " + (n === 1 ? one : many);
+}
+
+function heldParts(hold) {
+  const parts = [];
+  if (hold.moments) parts.push(counted(hold.moments, "match event", "match events"));
+  if (hold.analysis) parts.push(counted(hold.analysis, "analysis update", "analysis updates"));
+  return parts;
+}
+
+function holdText(hold) {
+  const head = "Paused at " + hold.at + ".";
+  if (hold.overflow) {
+    return head + " Too many updates to hold; the replay will reload when you resume.";
+  }
+  const parts = heldParts(hold);
+  let text = head + (parts.length ? " Waiting: " + parts.join(", ") + "." :
+    " No new match events or analysis updates yet.");
+  if (hold.restarted) text += " The replay has restarted.";
+  if (hold.finished) text += " The replay has finished.";
+  return text;
+}
+
+function resumeSummary(hold, at) {
+  if (hold.restarted) return "Resumed. The replay restarted while paused; now at " + at + ".";
+  const parts = heldParts(hold);
+  return "Resumed." + (parts.length ? " " + parts.join(" and ") + " applied; now" : " Now") +
+    " at " + at + ".";
+}
+
+function holdReceived(type, data) {
+  holdMessage(held, type, data);
+  if (held.overflow && source && source.readyState !== EventSource.CLOSED) source.close();
+  renderReplay();
+}
+
+// The server closes a finished replay's stream after every reconnect; an end that is held counts,
+// so a paused page treats those closures as quietly as an unpaused one.
+function streamEnded() {
+  return held ? held.ended : ended;
+}
+
+// Pausing needs a replay on screen and a stream that is neither loading nor lost for good.
+function canPause() {
+  return edition !== null && !reloading && PAUSABLE.has(replay);
+}
+
+function pause() {
+  if (held || !canPause()) return;
+  held = newHold(edition, ended, minute || DASH);
+  renderReplay();
+  announce("Paused at " + held.at + ". New updates are held.");
+}
+
+// The status after a resume comes from the connection as it is now, then the replayed data.
+function syncReplay() {
+  if (!source || source.readyState === EventSource.CLOSED) return;
+  if (source.readyState === EventSource.CONNECTING && !ended) {
+    setReplay("reconnecting", "Connection lost. Reconnecting automatically" + ELLIPSIS);
+  } else {
+    setReplay(ended ? "complete" : "replaying");
+  }
+}
+
+function resume() {
+  if (!held) return;
+  const done = held;
+  held = null;
+  if (done.overflow) {
+    frozenAt = done.at;
+    reloading = true;
+    if (source) source.close();
+    openStream();
+    announce("Resumed. The replay is reloading.");
+    return;
+  }
+  const history = catchingUp;
+  catchingUp = true;
+  // A restarted hold begins with the new edition event, which must reset the page even when its
+  // number matches the edition shown before the pause.
+  if (done.restarted) edition = null;
+  for (const [type, data] of done.items) apply(type, data);
+  catchingUp = history;
+  syncReplay();
+  renderReplay();
+  announce(resumeSummary(done, minute || DASH));
 }
 
 // --- connection ----------------------------------------------------------------------------
@@ -1045,22 +1598,78 @@ function reset() {
   setFeedStatus("awaiting_snapshot", "");
   refreshEmpty();
   chartReset();
+  statsReset();
 }
 
 function audience() {
   return document.querySelector("input[name=audience]:checked").value;
 }
 
+function onEdition(message) {
+  const number = message.edition;
+  if (reloading || number !== edition) {
+    const restart = edition !== null && !reloading;
+    reset();
+    ended = false;
+    if (reloading) {
+      reloading = false;
+      setReplay("replaying");
+      announce("The replay has been reloaded.");
+    } else if (restart) {
+      setReplay("replaying");
+      if (!catchingUp) announce("The replay is restarting from kick-off.");
+    }
+  }
+  edition = number;
+  started = true;
+  renderReplay();
+}
+
+function onEnd() {
+  ended = true;
+  setReplay("complete");
+  if (!catchingUp) announce("Replay complete.");
+}
+
+const STREAM_HANDLERS = { edition: onEdition, clock: onClock, stats: onStats, cue: onCue, end: onEnd };
+
+// Every stream message, live or released from a hold, is applied here, one at a time: a message
+// that fails is reported and does not stop the messages after it.
+function apply(type, data) {
+  try {
+    STREAM_HANDLERS[type](type === "end" ? null : JSON.parse(data));
+  } catch (error) {
+    reportError(error);
+  }
+}
+
+function receive(type, data) {
+  arrival();
+  if (held) holdReceived(type, data);
+  else apply(type, data);
+}
+
 function connect() {
+  held = null;
+  reloading = false;
   if (source) source.close();
   edition = null;
   ended = false;
   reset();
-  const id = $("match").value;
-  if (!id) return;
+  if (!$("match").value) {
+    renderReplay();
+    return;
+  }
+  openStream();
+}
+
+// A new stream sends no Last-Event-ID, so the server sends its current edition from the start.
+// While reloading, the page keeps what it shows until that edition arrives, then rebuilds it.
+function openStream() {
   catchingUp = true;
   lastArrival = 0;
-  setReplay("connecting");
+  setReplay(reloading ? "reloading" : "connecting");
+  const id = $("match").value;
   const params = new URLSearchParams({ audience: audience(), club: $("club").value });
   const stream = new EventSource("/matches/" + encodeURIComponent(id) + "/stream?" + params);
   source = stream;
@@ -1068,45 +1677,26 @@ function connect() {
     catchingUp = true;
     lastArrival = performance.now();
     if (replay === "reconnecting") announce("Reconnected.");
-    setReplay(ended ? "complete" : "replaying");
+    setReplay(reloading ? "reloading" : streamEnded() ? "complete" : "replaying");
   });
-  stream.addEventListener("edition", (e) => {
-    arrival();
-    const number = JSON.parse(e.data).edition;
-    if (number !== edition) {
-      const restart = edition !== null;
-      reset();
-      ended = false;
-      if (restart) {
-        setReplay("replaying");
-        if (!catchingUp) announce("The replay is restarting from kick-off.");
-      }
-    }
-    edition = number;
-    started = true;
-    refreshEmpty();
-  });
-  stream.addEventListener("clock", (e) => {
-    arrival();
-    onClock(JSON.parse(e.data));
-  });
-  stream.addEventListener("cue", (e) => {
-    arrival();
-    onCue(JSON.parse(e.data));
-  });
-  stream.addEventListener("end", () => {
-    arrival();
-    ended = true;
-    setReplay("complete");
-    if (!catchingUp) announce("Replay complete.");
-  });
+  stream.addEventListener("edition", (e) => receive("edition", e.data));
+  stream.addEventListener("clock", (e) => receive("clock", e.data));
+  stream.addEventListener("stats", (e) => receive("stats", e.data));
+  stream.addEventListener("cue", (e) => receive("cue", e.data));
+  stream.addEventListener("end", (e) => receive("end", e.data));
   stream.addEventListener("error", () => {
     if (stream !== source) return;
     if (stream.readyState === EventSource.CLOSED) {
-      const text = "This replay cannot be reached right now; the server may be busy.";
+      held = null;
+      let text = "This replay cannot be reached right now; the server may be busy.";
+      if (reloading) {
+        reloading = false;
+        text = "The replay could not be reloaded; the server may be busy. The page still shows " +
+          "the match as it was when updates were paused, at " + frozenAt + ".";
+      }
       setReplay("unavailable", text);
       alertNow(text);
-    } else if (!ended) {
+    } else if (!streamEnded()) {
       if (replay !== "reconnecting") announce("Connection lost. Reconnecting.");
       setReplay("reconnecting", "Connection lost. Reconnecting automatically" + ELLIPSIS);
     }
@@ -1168,6 +1758,10 @@ function selectMatch() {
   crest($("away-crest"), m.away);
   $("home-events").setAttribute("aria-label", m.home.name + " goals and red cards");
   $("away-events").setAttribute("aria-label", m.away.name + " goals and red cards");
+  $("stats-col-home").textContent = m.home.name + ", home";
+  $("stats-col-away").textContent = m.away.name + ", away";
+  $("stats-key-home").textContent = m.home.short_name;
+  $("stats-key-away").textContent = m.away.short_name;
   $("meta").textContent = m.competition + " \u00b7 Matchday " + m.matchday + " \u00b7 " + m.venue;
   $("match-title").textContent = m.home.name + " v " + m.away.name + ", replay";
   document.title = m.home.name + " v " + m.away.name + " \u00b7 MatchEyes";
@@ -1202,11 +1796,20 @@ async function init() {
   $("controls").addEventListener("submit", (e) => e.preventDefault());
   $("about-link").addEventListener("click", () => { $("about-details").open = true; });
   $("chart-svg").addEventListener("keydown", chartKey);
+  $("hold").addEventListener("click", () => (held ? resume() : pause()));
+  $("stats-latest").addEventListener("click", () => {
+    unpick();
+    $("stats-heading").focus();
+  });
   window.addEventListener("resize", layoutChart);
   if (!matches.length) setReplay("unavailable", "No match is available to replay.");
   connect();
 }
 
+for (const radio of document.querySelectorAll("input[name=theme]")) {
+  radio.addEventListener("change", setTheme);
+}
+setTheme();
 clearScore();
 refreshEmpty();
 layoutChart();
