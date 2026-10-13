@@ -28,7 +28,13 @@ from matcheyes.domain.events import MatchEvent
 from matcheyes.domain.match import ObservableMatch
 from matcheyes.lifecycle.contracts import LifecycleState, SnapshotOutcome
 from matcheyes.lifecycle.engine import replay
-from matcheyes.lifecycle.evaluate import Evaluator, SnapshotEvaluation, evaluate_snapshot
+from matcheyes.lifecycle.evaluate import (
+    AnalysedEvaluation,
+    Evaluator,
+    SnapshotEvaluation,
+    evaluate_and_analyse,
+    evaluate_snapshot,
+)
 from matcheyes.lifecycle.snapshot import Snapshot
 from matcheyes.orchestration.investigation import InvestigationConfig
 
@@ -88,6 +94,11 @@ def recorded_reasoner(model: RecordedModel) -> ReasoningModel:
 def recorded_evaluator(model: RecordedModel) -> Evaluator:
     """Snapshot evaluation that answers every model request from a transcript."""
     return partial(evaluate_snapshot, model=recorded_reasoner(model), config=MODEL_CONFIG)
+
+
+def recorded_analysis(model: RecordedModel) -> Callable[[Snapshot], AnalysedEvaluation]:
+    """`recorded_evaluator`, plus the validity and Stage 2 analytics it computed on each prefix."""
+    return partial(evaluate_and_analyse, model=recorded_reasoner(model), config=MODEL_CONFIG)
 
 
 def lifecycle_from(

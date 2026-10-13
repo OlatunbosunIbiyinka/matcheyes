@@ -54,7 +54,7 @@ from matcheyes.lifecycle.recording import (
     MODEL_CONFIG,
     lifecycle_from,
     record_lifecycle,
-    recorded_evaluator,
+    recorded_analysis,
     recorded_reasoner,
     replayed_lifecycle,
     unavailable_insights,
@@ -280,7 +280,7 @@ def _backends(catalog: dict[str, ObservableMatch], recordings: Path | None) -> d
             transcript_sha256=pins[mid],
         )
         backends[mid] = Backend(
-            CachingEvaluator(recorded_evaluator(model)),
+            CachingEvaluator(analyse=recorded_analysis(model)),
             identity,
             Explainer(match, reasoner, identity, MODEL_CONFIG),
         )

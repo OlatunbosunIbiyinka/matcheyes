@@ -21,6 +21,7 @@ records link to their replacement.
 | [0014](0014-broadcast-cue-contract-and-live-presentation-surface.md) | Broadcast cue contract and live presentation surface (content-addressed cues compiled from the lifecycle record, moments at the next snapshot close, explicit retractions, deterministic selection, one server-owned replay per match over stdlib SSE, read-only API, CSP static surface; truth pipeline unchanged) | Accepted |
 
 | [0015](0015-foundry-model-as-untrusted-reasoner.md) | A Microsoft Foundry model as an untrusted reasoner behind the existing boundary (strict wire schemas, Entra auth, role split B′ adopted on measured evidence, recorded runs only on the public surface, read-only show-your-work, field-attributed leakage) | Proposed |
+| [0016](0016-snapshot-anchored-team-statistics.md) | Snapshot-anchored team statistics (eight existing Stage 2 measures, cumulative per snapshot prefix and never revised, validity from data and analytics only, server-formatted values, separate SSE `stats` event; cue contract unchanged) | Proposed |
 
 ## Planned (decided at the stage where evidence exists)
 
