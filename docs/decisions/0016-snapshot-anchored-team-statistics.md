@@ -1,8 +1,8 @@
 # ADR-0016: Snapshot-anchored team statistics
 
 - Status: Proposed (Stage 10.3 step 1: contract and tests; step 2: serving implemented and tested,
-  with the evaluation's analytics reused, both performance gates met; awaiting approval; frontend
-  not started)
+  with the evaluation's analytics reused, both performance gates met; step 3: frontend implemented
+  and tested; awaiting approval)
 - Date: 2026-10-10
 - Stage: 10.3
 
@@ -257,14 +257,15 @@ compiler order. Step 2 is accepted only when tests show all of the following:
   same key and bound, evicted together. `_stats` reuses them through
   `snapshot_stats_from(snapshot, validity, summaries, series)` only if they belong to this
   `LiveMatch`'s evaluator, their snapshot ID and log digest equal the header's, and they are either
-  invalid or carry Stage 2 results. Otherwise, including recorded backends, other evaluators,
-  evicted entries and Stage 2 failures, the full build runs as before. `snapshot_stats` is now
-  validity and analytics followed by `snapshot_stats_from`, so both paths share all formatting,
-  allocation and validation. Tests: `tests/api/test_stats_reuse.py`.
+  invalid or carry Stage 2 results. Recorded backends evaluate with `recorded_analysis` and reuse
+  in the same way (`tests/api/test_recorded_stats_reuse.py`). Otherwise, including other
+  evaluators, evicted entries and Stage 2 failures, the full build runs as before.
+  `snapshot_stats` is now validity and analytics followed by `snapshot_stats_from`, so both paths
+  share all formatting, allocation and validation. Tests: `tests/api/test_stats_reuse.py`.
 * Tests: `tests/api/test_live_stats.py` (criteria 1–8, cache, failure paths, resume through the
-  real server) and `tests/architecture/test_stage10_serving.py` (the frontend listens to no
-  `stats` event and reads no statistics field; the live driver reaches analytics only through
-  `broadcast.stats`).
+  real server) and `tests/architecture/test_stage10_serving.py` (the frontend listens to the
+  `stats` event and reads only allow-listed statistics fields; the live driver reaches analytics
+  only through `broadcast.stats`).
 
 ### Time cursor (for step 3)
 
@@ -409,8 +410,10 @@ reuses `LiveMatch.replay_seconds` and needs no new dependency.
 * Early in a match proportions show "Not enough data" until the minimum sample is reached
   (minutes 1–8 in the measured matches), and PPDA until both teams have a defensive action in the
   zone (up to minute 8).
-* Each snapshot costs a second, lighter Stage 2 pass. Caching by `snapshot_id` bounds it to once
-  per snapshot.
-* Step 2 (serving) and step 3 (frontend) need their own review. The frontend allowlist test will
-  gain a statistics-field allowlist. The page renders only `display` strings and keeps the existing
-  bans (no `fetch` besides the allowed ones, banned wording including "metric").
+* Where the evaluation's analytics can be reused (the reference and recorded backends), statistics
+  need no second Stage 2 pass; otherwise each snapshot costs a second, lighter pass. Caching by
+  `snapshot_id` bounds it to once per snapshot.
+* Step 2 (serving) and step 3 (frontend) need their own review. The frontend allowlist test has a
+  statistics-field allowlist (`tests/architecture/test_stage10_serving.py`). The page renders only
+  `display` strings and keeps the existing bans (no `fetch` besides the allowed ones, banned
+  wording including "metric").
