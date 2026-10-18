@@ -23,10 +23,14 @@ python -m matcheyes record <match_dir>      Stage 9: record the configured model
 """
 
 import argparse
+import faulthandler
 import json
 import os
+import signal
 import sys
+import threading
 import time
+from collections.abc import Callable
 from pathlib import Path
 
 from pydantic import ValidationError
@@ -42,7 +46,12 @@ from matcheyes.analytics.contextual import ContextualAnalysis, analyse_contextua
 from matcheyes.analytics.moments import Names
 from matcheyes.api.catalog import load_catalog
 from matcheyes.api.live import Backend, CachingEvaluator
-from matcheyes.api.server import BroadcastApp, BroadcastServer
+from matcheyes.api.server import (
+    SHUTDOWN_SECONDS,
+    BroadcastApp,
+    BroadcastServer,
+    ShutdownRequested,
+)
 from matcheyes.broadcast.compiler import compile_timeline
 from matcheyes.broadcast.contracts import BROADCAST_AUDIENCES, CueTimeline
 from matcheyes.domain.match import ObservableMatch
@@ -212,7 +221,95 @@ def _cues(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
     return 0
 
 
+WATCHDOG_SECONDS = 30
+WATCHDOG_REARM_SECONDS = 5.0
+WATCHDOG_GRACE_SECONDS = 5.0
+
+
+class Watchdog:
+    """The serving process's watchdog (ADR-0017): a `faulthandler` timer that, unless re-armed
+    within 30 s, writes every thread's stack to stderr and exits 1. Each accept-loop tick
+    re-arms it once 5 s have passed since the last arm. After a failed arm the process is
+    unprotected: the main thread writes nothing to stderr, retries on every tick and, unless
+    protection is back within 5 s, exits 1 without writing. Recovery is logged only once the
+    new timer exists."""
+
+    def __init__(self, clock: Callable[[], float] = time.monotonic) -> None:
+        self.clock = clock
+        self.state = "idle"
+        self.armed_at = self.since = 0.0
+        self.failures = 0
+        self.first_error = ""
+
+    def arm_initial(self) -> bool:
+        return self._arm(self.clock())
+
+    def tick(self) -> bool:
+        """Once per accept-loop iteration; whether the main thread may write to stderr."""
+        if self.state == "stopped":
+            return True
+        now = self.clock()
+        if self.state == "protected" and now - self.armed_at < WATCHDOG_REARM_SECONDS:
+            return True
+        if self._arm(now):
+            return True
+        if now - self.since >= WATCHDOG_GRACE_SECONDS:
+            os._exit(1)
+        return False
+
+    def stop(self) -> None:
+        self.state = "stopped"
+        faulthandler.cancel_dump_traceback_later()
+
+    def _arm(self, now: float) -> bool:
+        try:
+            faulthandler.dump_traceback_later(WATCHDOG_SECONDS, exit=True)
+        except Exception as error:  # the timer may be gone: treat as unprotected
+            if self.state != "unprotected":
+                self.state, self.since, self.failures = "unprotected", now, 0
+                self.first_error = type(error).__name__
+            self.failures += 1
+            return False
+        recovered = self.state == "unprotected"
+        self.state, self.armed_at = "protected", now
+        if recovered:
+            sys.stderr.write(
+                f"watchdog re-armed after {self.failures} failed attempts "
+                f"(first error {self.first_error})\n"
+            )
+        return True
+
+
+class Signals:
+    """SIGTERM and SIGINT while serving: the first is only recorded, and shutdown starts at the
+    accept loop's next safe point; a second exits at once with 128 + its number."""
+
+    def __init__(self) -> None:
+        self.first: tuple[int, float] | None = None
+
+    def handle(self, signum: int, frame: object) -> None:
+        if self.first is None:
+            self.first = (signum, time.monotonic())
+            return
+        os._exit(128 + signum)
+
+
 def _serve(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
+    signals = Signals()
+    previous = (
+        {s: signal.signal(s, signals.handle) for s in (signal.SIGTERM, signal.SIGINT)}
+        if threading.current_thread() is threading.main_thread()
+        else {}
+    )
+    try:
+        return _serving(parser, args, signals)
+    finally:
+        for signum, handler in previous.items():
+            if handler is not None:
+                signal.signal(signum, handler)
+
+
+def _serving(parser: argparse.ArgumentParser, args: argparse.Namespace, signals: Signals) -> int:
     if not 0 <= args.speed <= 600:
         parser.error("--speed must be between 0 and 600")
     if not 0 <= args.port <= 65535:
@@ -223,24 +320,35 @@ def _serve(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
     except (OSError, ValueError) as error:
         parser.error(f"cannot load matches: {error}")
     app = BroadcastApp(catalog, args.speed, loop=not args.no_loop, backends=backends)
-    server = BroadcastServer((args.host, args.port), app)
-    host, port = server.server_address[:2]
-    sys.stdout.write(
-        f"MatchEyes broadcast surface on http://{host!s}:{port} - {len(catalog)} match(es), "
-        f"speed x{args.speed:g}. Ctrl+C to stop.\n"
+    watchdog = Watchdog()
+    server = BroadcastServer(
+        (args.host, args.port),
+        app,
+        on_tick=watchdog.tick,
+        should_stop=lambda: signals.first is not None,
     )
-    for mid, backend in backends.items():
-        r = backend.reasoner
-        sha = f" transcript {r.transcript_sha256[:12]}" if r.transcript_sha256 else ""
-        sys.stdout.write(f"  {mid}: {r.kind} reasoner {r.name}{sha}\n")
-    sys.stdout.flush()
     try:
+        if not watchdog.arm_initial():
+            os._exit(1)
+        host, port = server.server_address[:2]
+        sys.stdout.write(
+            f"MatchEyes broadcast surface on http://{host!s}:{port} - {len(catalog)} match(es), "
+            f"speed x{args.speed:g}. Ctrl+C to stop.\n"
+        )
+        for mid, backend in backends.items():
+            r = backend.reasoner
+            sha = f" transcript {r.transcript_sha256[:12]}" if r.transcript_sha256 else ""
+            run = app.live[mid].run
+            sys.stdout.write(f"  {mid}: {r.kind} reasoner {r.name}{sha} run {run}\n")
+        sys.stdout.flush()
         server.serve_forever()
-    except KeyboardInterrupt:
+    except (ShutdownRequested, KeyboardInterrupt):
         pass
     finally:
-        server.server_close()
-    return 0
+        watchdog.stop()
+        began = signals.first[1] if signals.first is not None else time.monotonic()
+        complete = server.close_gracefully(began + SHUTDOWN_SECONDS)
+    return 0 if complete else 1
 
 
 PINS_FILE = "pins.json"
@@ -277,12 +385,13 @@ def _backends(catalog: dict[str, ObservableMatch], recordings: Path | None) -> d
             name=reasoner.name,
             deployment=model.metadata.get("deployment"),
             served_models=model.metadata.get("served_models"),
-            transcript_sha256=pins[mid],
+            transcript_sha256=pins[mid] if model.usable else None,
         )
         backends[mid] = Backend(
             CachingEvaluator(analyse=recorded_analysis(model)),
             identity,
             Explainer(match, reasoner, identity, MODEL_CONFIG),
+            available=model.usable,
         )
     return backends
 

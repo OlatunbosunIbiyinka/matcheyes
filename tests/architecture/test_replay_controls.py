@@ -38,9 +38,12 @@ def _function(name: str) -> str:
 
 def test_every_stream_event_is_received_through_one_path() -> None:
     for event in STREAM_EVENTS:
-        assert f'stream.addEventListener("{event}", (e) => receive("{event}", e.data));' in JS
+        assert (
+            f'stream.addEventListener("{event}", (e) => '
+            f'{{ if (stream === source) receive("{event}", e.data); }});'
+        ) in JS
     listened = re.findall(r'stream\.addEventListener\(\s*"([a-z_]+)"', JS)
-    assert sorted(listened) == sorted((*STREAM_EVENTS, "open", "error"))
+    assert sorted(listened) == sorted((*STREAM_EVENTS, "open", "error", "unavailable"))
     table = re.search(r"const STREAM_HANDLERS = \{(.*?)\};", JS)
     assert table
     assert dict(re.findall(r"(\w+): (\w+)", table.group(1))) == dict(
@@ -78,6 +81,31 @@ def test_a_held_end_keeps_the_closures_after_it_quiet() -> None:
     assert '} else if (!streamEnded()) {\n      if (replay !== "reconnecting")' in stream
     assert 'streamEnded() ? "complete" : "replaying"' in stream
     assert not re.search(r"[!(]\s*ended\b", stream)
+
+
+def test_a_replaced_stream_changes_nothing_and_an_unavailable_replay_stops_the_stream() -> None:
+    stream = _function("openStream")
+    for event in ("open", "unavailable", "error"):
+        start = stream.index(f'stream.addEventListener("{event}"')
+        assert "if (stream !== source) return;" in stream[start : stream.index("\n", start) + 40]
+    start = stream.index('stream.addEventListener("unavailable"')
+    unavailable = stream[start : stream.index("});", start)]
+    assert "stream.close();" in unavailable and "held = null;" in unavailable
+    assert 'setReplay("unavailable", text);' in unavailable and "alertNow(text);" in unavailable
+    assert "receive(" not in unavailable
+
+
+def test_a_new_run_resets_the_page_and_stale_work_is_ignored() -> None:
+    edition = _function("onEdition")
+    assert "const otherRun = message.run !== run;" in edition
+    assert "if (reloading || otherRun || number !== edition) {" in edition
+    assert edition.index("reset();") < edition.index("run = message.run;")
+    work = _function("showWork")
+    assert work.index("const requestedRun = run;") < work.index("await fetch(workUrl)")
+    assert 'if (run !== requestedRun || body.run !== run) throw new Error("another replay");' in (
+        work
+    )
+    assert work.index("another replay") < work.index("renderRows(")
 
 
 def test_overflow_recovery_uses_a_new_stream_and_no_automatic_reconnect() -> None:
@@ -194,6 +222,24 @@ def test_a_new_edition_discards_what_it_resets_and_repeats_are_dropped() -> None
     assert ends_text.endswith("The replay has finished.")
     assert was_ended["items"] == [] and not was_ended["finished"]
     assert re_ended["items"] == ["edition", "end"] and re_ended["finished"]
+
+
+def test_an_edition_of_another_run_restarts_the_hold() -> None:
+    result = _run_hold(
+        HOLD_RUNNER
+        + """
+        const run = (r, n) => JSON.stringify({ edition: n, run: r });
+        const hold = newHold(0, true, "12'", "a");
+        for (const [t, d] of [["cue", cue("moment")], ["edition", run("a", 0)], ["end", ""],
+          ["edition", run("b", 0)], ["clock", "{}"], ["edition", run("b", 0)]]) {
+          holdMessage(hold, t, d);
+        }
+        console.log(JSON.stringify(view(hold)));"""
+    )
+    assert isinstance(result, dict)
+    assert result["items"] == ["edition", "clock"]
+    assert (result["edition"], result["run"], result["restarted"]) == (0, "b", True)
+    assert (result["ended"], result["finished"], result["moments"]) == (False, False, 0)
 
 
 def test_malformed_edition_events_are_reduced_as_the_handler_reads_them() -> None:

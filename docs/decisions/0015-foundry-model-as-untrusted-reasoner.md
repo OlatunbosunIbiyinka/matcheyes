@@ -139,3 +139,37 @@ planned target is Azure Container Apps with one replica; the deployment has not 
 No Foundry Agent Service, Microsoft Agent Framework, AKS, Event Hubs, Cosmos DB, Redis,
 Functions, API Management or Key Vault. No model calls from public traffic, no model text on
 screen, no hidden synthetic truth in any model input, no changes to Stage 2–8 semantics.
+
+## Amendment: deployment gate scope (2026-10-14)
+
+The deployment gate described in Consequences applies to the selected public deployment
+configuration: adopted configuration B′, the S05 reasoning recording pinned in
+`deploy/recordings/pins.json` (transcript SHA-256 `fc0df91d…a708e`), and the container image
+serving that recording.
+
+* **Configuration B remains rejected.** Its existing leakage findings and contained auditor
+  finding ([Stage 9 evaluation](../stage9-evaluation.md), §§4–5) remain unresolved. This
+  amendment does not remediate, close, or reclassify those findings.
+* **B′ must independently satisfy every applicable hard security invariant.** Its documented
+  evaluation results are evidence for B′ within the evaluated scope, not a general guarantee of
+  application or deployment security.
+* **Provisioning remains blocked** until the artifact intended for deployment has been inspected
+  and has passed security and runtime acceptance testing, with remaining findings transparently
+  classified and any necessary explicit acceptance obtained.
+
+This amendment clarifies the scope of the gate only. It does not change the ADR's status, change
+configuration B's status or findings, or authorise implementation work or Azure provisioning.
+
+## Amendment: a recording that fails its pin is not served (2026-10-15)
+
+A recording whose transcript does not match its pin is not served
+([ADR-0017](0017-replay-lifecycle-identity-and-serving-bounds.md)):
+
+* the match is `recording_unavailable`;
+* readiness answers 503 with reason `recording`;
+* its timeline and stream answer 503;
+* its reasoner description carries `transcript_sha256` as null, and the start-up banner shows no
+  transcript.
+
+There is still no fallback to the reference reasoner. This amendment does not change the
+deployment gate above.

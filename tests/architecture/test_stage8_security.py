@@ -44,6 +44,7 @@ REASONING_NAMES = ("ReasoningModel", "OpenAICompatibleModel", "LLMSettings", "Ru
 API_STDLIB = {
     "json",
     "re",
+    "secrets",
     "sys",
     "time",
     "threading",
@@ -53,10 +54,11 @@ API_STDLIB = {
     "http.server",
     "urllib.parse",
 }
-"""Modules, or modules whose names are imported; `from http import HTTPStatus` is the only other."""
+"""Modules, or modules whose names are imported; `from http import HTTPStatus` and
+`from io import BytesIO` are the only others."""
 API_WRITES = re.compile(
     r"write_text|write_bytes|\bopen\(|mkdir|unlink|rmdir|\.rename\(|\.replace\(|sqlite3"
-    r"|tempfile|shelve|\bdbm\b|environ|getenv"
+    r"|tempfile|shelve|\bdbm\b|environ|getenv|\bFileIO\b"
 )
 TRUTH_NAMES = ("matcheyes_synth", "matcheyes_eval", "answer_key", "manifest", "scenario")
 TRUTH_WORDS = re.compile(r"scenario|answer|truth|seed|intervention|planted|manifest|S\d{2}_", re.I)
@@ -84,7 +86,7 @@ def test_the_api_uses_allow_listed_modules_and_writes_nothing(path: Path) -> Non
     for module in imported_modules(path):
         if not module.startswith("matcheyes."):
             allowed = module in API_STDLIB or module.rsplit(".", 1)[0] in API_STDLIB
-            allowed = allowed or module in ("http", "http.HTTPStatus")
+            allowed = allowed or module in ("http", "http.HTTPStatus", "io", "io.BytesIO")
             assert allowed, f"{path.name} imports {module}"
     hit = API_WRITES.search(path.read_text(encoding="utf-8"))
     assert hit is None, f"{path.name} uses {hit.group(0) if hit else ''}"

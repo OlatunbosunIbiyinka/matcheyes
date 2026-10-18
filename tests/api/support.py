@@ -1,15 +1,28 @@
 """A real broadcast server on an ephemeral localhost port, over the lifecycle reference match."""
 
+import faulthandler
 import http.client
 import json
+import os
 import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import Any
 
+import pytest
+
+from matcheyes.__main__ import WATCHDOG_SECONDS
 from matcheyes.api.live import LiveMatch
 from matcheyes.api.server import BroadcastApp, BroadcastServer
 from tests.lifecycle.support import evaluator, in_progress
+from tests.support.imports import SRC_ROOT
+
+
+def child_env() -> dict[str, str]:
+    """The environment for a child interpreter: this tree's `src` first, as pytest's
+    `pythonpath` gives the test process, whether or not the project is installed."""
+    paths = [str(SRC_ROOT), *filter(None, [os.environ.get("PYTHONPATH")])]
+    return {**os.environ, "PYTHONPATH": os.pathsep.join(paths)}
 
 
 def app(**options: Any) -> BroadcastApp:
@@ -18,18 +31,40 @@ def app(**options: Any) -> BroadcastApp:
     return BroadcastApp({match.info.match_id: match}, **settings)
 
 
+def fake_watchdog(monkeypatch: pytest.MonkeyPatch, calls: list[str], arms: int = 1) -> None:
+    """Record arming and cancelling instead of starting a real timer in the test process (whose
+    captured stderr has no file descriptor); every arm after the first `arms` fails."""
+
+    def arm(timeout: int, exit: bool = False) -> None:
+        assert (timeout, exit) == (WATCHDOG_SECONDS, True)
+        calls.append("arm")
+        if calls.count("arm") > arms:
+            raise RuntimeError("can't start new thread")
+
+    monkeypatch.setattr(faulthandler, "dump_traceback_later", arm)
+    monkeypatch.setattr(faulthandler, "cancel_dump_traceback_later", lambda: calls.append("cancel"))
+
+
 @contextmanager
-def serving(broadcast: BroadcastApp) -> Iterator[tuple[str, int]]:
-    server = BroadcastServer(("127.0.0.1", 0), broadcast)
+def running(
+    broadcast: BroadcastApp, **server_options: Any
+) -> Iterator[tuple[BroadcastServer, tuple[str, int]]]:
+    server = BroadcastServer(("127.0.0.1", 0), broadcast, **server_options)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:
         host, port = server.server_address[:2]
-        yield str(host), int(port)
+        yield server, (str(host), int(port))
     finally:
         server.shutdown()
         server.server_close()
         thread.join(timeout=10)
+
+
+@contextmanager
+def serving(broadcast: BroadcastApp, **server_options: Any) -> Iterator[tuple[str, int]]:
+    with running(broadcast, **server_options) as (_, address):
+        yield address
 
 
 def request(

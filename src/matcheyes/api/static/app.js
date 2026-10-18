@@ -60,6 +60,7 @@ const CATCH_UP_GAP_MS = 400;
 
 let source = null;
 let edition = null;
+let run = null; // the server's replay identity; a different one is a different replay
 let started = false;
 let ended = false;
 let replay = "connecting";
@@ -428,6 +429,7 @@ function renderRows(box, rows) {
 async function showWork(item) {
   const storyline = item.storyline;
   const revision = item.revision;
+  const requestedRun = run;
   item.workStatus.textContent = "Loading revision " + revision + ELLIPSIS;
   const workUrl = "/matches/" + encodeURIComponent($("match").value) + "/storylines/" +
     encodeURIComponent(storyline) + "/revisions/" + encodeURIComponent(String(revision));
@@ -435,6 +437,7 @@ async function showWork(item) {
     const response = await fetch(workUrl);
     if (!response.ok) throw new Error("unavailable");
     const body = await response.json();
+    if (run !== requestedRun || body.run !== run) throw new Error("another replay");
     item.workStatus.textContent = "Revision " + revision + " of this insight.";
     renderRows(item.workRows, body.rows);
     item.shown = revision;
@@ -1432,10 +1435,10 @@ let held = null; // while paused: the hold of received messages
 let reloading = false; // a new stream is reloading the edition after a hold overflowed
 let frozenAt = ""; // the minute shown when the overflowed hold was paused
 
-function newHold(editionNumber, isEnded, at) {
+function newHold(editionNumber, isEnded, at, runId) {
   return {
-    items: [], units: 0, edition: editionNumber, ended: isEnded, at, moments: 0, analysis: 0,
-    restarted: false, finished: false, overflow: false,
+    items: [], units: 0, edition: editionNumber, run: runId, ended: isEnded, at, moments: 0,
+    analysis: 0, restarted: false, finished: false, overflow: false,
   };
 }
 
@@ -1450,17 +1453,19 @@ function parsedField(data, name) {
 }
 
 // Adds a received message to a hold. Dropped are only messages that applying could not change:
-// everything before a new edition (whose arrival resets the page), an edition event for the
-// edition already reached, and an end after an end of the same edition. An edition event the
-// handler cannot read changes nothing when applied, so it is kept as it is.
+// everything before a new edition or run (whose arrival resets the page), an edition event for
+// the edition and run already reached, and an end after an end of the same edition. An edition
+// event the handler cannot read changes nothing when applied, so it is kept as it is.
 function holdMessage(hold, type, data) {
   if (hold.overflow) return hold;
   if (type === "edition") {
     const number = parsedField(data, "edition");
-    if (number && number.value === hold.edition) return hold;
+    const runId = parsedField(data, "run");
+    if (number && number.value === hold.edition && runId.value === hold.run) return hold;
     if (number) {
       Object.assign(hold, { items: [], units: 0, moments: 0, analysis: 0, finished: false });
-      Object.assign(hold, { edition: number.value, ended: false, restarted: true });
+      Object.assign(hold, { edition: number.value, run: runId.value, ended: false });
+      hold.restarted = true;
     }
   } else if (type === "end") {
     if (hold.ended) return hold;
@@ -1528,7 +1533,7 @@ function canPause() {
 
 function pause() {
   if (held || !canPause()) return;
-  held = newHold(edition, ended, minute || DASH);
+  held = newHold(edition, ended, minute || DASH, run);
   renderReplay();
   announce("Paused at " + held.at + ". New updates are held.");
 }
@@ -1607,7 +1612,8 @@ function audience() {
 
 function onEdition(message) {
   const number = message.edition;
-  if (reloading || number !== edition) {
+  const otherRun = message.run !== run;
+  if (reloading || otherRun || number !== edition) {
     const restart = edition !== null && !reloading;
     reset();
     ended = false;
@@ -1615,11 +1621,15 @@ function onEdition(message) {
       reloading = false;
       setReplay("replaying");
       announce("The replay has been reloaded.");
+    } else if (restart && otherRun && run !== null) {
+      setReplay("replaying");
+      announce("The replay restarted on the server. Showing it from kick-off.");
     } else if (restart) {
       setReplay("replaying");
       if (!catchingUp) announce("The replay is restarting from kick-off.");
     }
   }
+  run = message.run;
   edition = number;
   started = true;
   renderReplay();
@@ -1654,6 +1664,7 @@ function connect() {
   reloading = false;
   if (source) source.close();
   edition = null;
+  run = null;
   ended = false;
   reset();
   if (!$("match").value) {
@@ -1674,16 +1685,26 @@ function openStream() {
   const stream = new EventSource("/matches/" + encodeURIComponent(id) + "/stream?" + params);
   source = stream;
   stream.addEventListener("open", () => {
+    if (stream !== source) return;
     catchingUp = true;
     lastArrival = performance.now();
     if (replay === "reconnecting") announce("Reconnected.");
     setReplay(reloading ? "reloading" : streamEnded() ? "complete" : "replaying");
   });
-  stream.addEventListener("edition", (e) => receive("edition", e.data));
-  stream.addEventListener("clock", (e) => receive("clock", e.data));
-  stream.addEventListener("stats", (e) => receive("stats", e.data));
-  stream.addEventListener("cue", (e) => receive("cue", e.data));
-  stream.addEventListener("end", (e) => receive("end", e.data));
+  stream.addEventListener("edition", (e) => { if (stream === source) receive("edition", e.data); });
+  stream.addEventListener("clock", (e) => { if (stream === source) receive("clock", e.data); });
+  stream.addEventListener("stats", (e) => { if (stream === source) receive("stats", e.data); });
+  stream.addEventListener("cue", (e) => { if (stream === source) receive("cue", e.data); });
+  stream.addEventListener("end", (e) => { if (stream === source) receive("end", e.data); });
+  stream.addEventListener("unavailable", () => {
+    if (stream !== source) return;
+    stream.close();
+    held = null;
+    reloading = false;
+    const text = "The replay is unavailable on the server right now.";
+    setReplay("unavailable", text);
+    alertNow(text);
+  });
   stream.addEventListener("error", () => {
     if (stream !== source) return;
     if (stream.readyState === EventSource.CLOSED) {

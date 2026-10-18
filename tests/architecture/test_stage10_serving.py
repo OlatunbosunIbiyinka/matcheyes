@@ -20,7 +20,7 @@ STATIC = SRC_ROOT / "matcheyes" / "api" / "static"
 LIVE = SRC_ROOT / "matcheyes" / "api" / "live.py"
 JS = (STATIC / "app.js").read_text("utf-8")
 HTML = (STATIC / "index.html").read_text("utf-8")
-STREAM_EVENTS = {"edition", "clock", "stats", "cue", "end"}
+STREAM_EVENTS = {"edition", "clock", "stats", "cue", "end", "unavailable"}
 CONNECTION_EVENTS = {"open", "error"}
 # The names the statistics code gives each part of a message, and the fields it may read on each.
 STATS_FIELDS = {

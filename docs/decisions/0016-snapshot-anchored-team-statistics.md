@@ -417,3 +417,11 @@ reuses `LiveMatch.replay_seconds` and needs no new dependency.
   statistics-field allowlist (`tests/architecture/test_stage10_serving.py`). The page renders only
   `display` strings and keeps the existing bans (no `fetch` besides the allowed ones, banned
   wording including "metric").
+
+## Amendment: stream message IDs (2026-10-15)
+
+Since [ADR-0017](0017-replay-lifecycle-identity-and-serving-bounds.md), numbered message IDs are
+`{run}:{edition}:{index}` rather than `edition:index`, and the edition marker carries
+`{run}:{edition}:start`. Properties 3–5 above hold within a run, with `Last-Event-ID: run:e:i`.
+A `Last-Event-ID` from another run gets 204 and the client rebuilds. Indices, ordering and the cues
+are unchanged.

@@ -1,6 +1,7 @@
 """`python -m matcheyes record` and `serve --recordings`: recorded model lifecycles, never live."""
 
 import json
+import time
 from pathlib import Path
 from typing import Any
 
@@ -9,6 +10,8 @@ import pytest
 import matcheyes.__main__ as cli
 from matcheyes.agents.llm import LLMSettings, Usage
 from matcheyes.agents.reasoning import AgentTask, RuleBasedReasoner
+from matcheyes.api.live import RECORDING_UNAVAILABLE
+from tests.api.support import fake_watchdog
 from tests.lifecycle.support import in_progress
 
 pytestmark = pytest.mark.integration
@@ -62,6 +65,7 @@ def _serve(monkeypatch: pytest.MonkeyPatch, recordings: Path) -> Any:
 
     monkeypatch.setattr(cli, "load_catalog", lambda _: {MATCH: in_progress()})
     monkeypatch.setattr(cli.BroadcastServer, "serve_forever", interrupted)
+    fake_watchdog(monkeypatch, [])
     argv = ["serve", "unused", "--port", "0", "--speed", "0", "--no-loop"]
     assert cli.main([*argv, "--recordings", str(recordings)]) == 0
     return seen["app"]
@@ -96,6 +100,9 @@ def test_a_mispinned_recording_is_reported_and_never_falls_back(
     capsys.readouterr()
     app = _serve(monkeypatch, recordings)
     assert app.live[MATCH].reasoner.kind == "recorded-model"
+    assert app.live[MATCH].reasoner.transcript_sha256 is None
+    assert app.live[MATCH].state == RECORDING_UNAVAILABLE and not app.live[MATCH].serving
+    assert app.live[MATCH].health(time.monotonic() + 1) == "recording"
     assert "transcript unusable (transcript hash mismatch)" in capsys.readouterr().err
 
 

@@ -22,6 +22,7 @@ records link to their replacement.
 
 | [0015](0015-foundry-model-as-untrusted-reasoner.md) | A Microsoft Foundry model as an untrusted reasoner behind the existing boundary (strict wire schemas, Entra auth, role split B′ adopted on measured evidence, recorded runs only on the public surface, read-only show-your-work, field-attributed leakage) | Proposed |
 | [0016](0016-snapshot-anchored-team-statistics.md) | Snapshot-anchored team statistics (eight existing Stage 2 measures, cumulative per snapshot prefix and never revised, validity from data and analytics only, server-formatted values, separate SSE `stats` event; cue contract unchanged) | Proposed |
+| [0017](0017-replay-lifecycle-identity-and-serving-bounds.md) | Replay lifecycle, run identity and serving bounds (explicit replay states with visible failure, `/health` as readiness, random run identity in stream IDs, bounded connections, heads, streams and shutdown, in-process `faulthandler` watchdog) | Proposed |
 
 ## Planned (decided at the stage where evidence exists)
 

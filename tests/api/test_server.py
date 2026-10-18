@@ -1,6 +1,8 @@
 """The read-only HTTP API and its Server-Sent Events stream, over a real localhost server."""
 
+import http.client
 import json
+import re
 from collections.abc import Iterator
 
 import pytest
@@ -83,18 +85,29 @@ def test_the_live_timeline_equals_the_offline_compile(
     assert body["timeline"] == json.loads(offline(audience, team))
 
 
+def _run(address: tuple[str, int]) -> str:
+    status, body = get_json(address, f"/matches/{MATCH}/timeline")
+    assert status == 200 and re.fullmatch(r"[0-9a-f]{32}", body["run"])
+    return str(body["run"])
+
+
 def test_the_stream_replays_exactly_the_canonical_cues(address: tuple[str, int]) -> None:
+    run = _run(address)
     status, headers, body = request(address, f"/matches/{MATCH}/stream?audience=fan")
     assert status == 200 and headers["Content-Type"].startswith("text/event-stream")
     assert headers["Content-Security-Policy"] == CSP
     messages = sse(body)
     assert messages[0] == {"retry": "3000"}
-    assert messages[1] == {"event": "edition", "data": '{"edition":0}'}
+    assert messages[1] == {
+        "id": f"{run}:0:start",
+        "event": "edition",
+        "data": f'{{"edition":0,"run":"{run}"}}',
+    }
     assert messages[-1] == {"event": "end", "data": '{"edition":0}'}
     cues = [json.loads(m["data"]) for m in messages if m.get("event") == "cue"]
     assert cues == json.loads(offline(Audience.FAN))["cues"]
-    ids = [m["id"] for m in messages if "id" in m]
-    assert ids == [f"0:{i}" for i in range(len(ids))]
+    ids = [m["id"] for m in messages[2:] if "id" in m]
+    assert ids == [f"{run}:0:{i}" for i in range(len(ids))]
     ticks = [json.loads(m["data"]) for m in messages if m.get("event") == "clock"]
     assert len(ticks) == len(reference().state.snapshots)
     assert set(ticks[0]) == {
@@ -109,14 +122,22 @@ def test_the_stream_replays_exactly_the_canonical_cues(address: tuple[str, int])
 
 
 def test_the_stream_resumes_after_the_last_event_id(address: tuple[str, int]) -> None:
+    run = _run(address)
     path = f"/matches/{MATCH}/stream?audience=fan"
     full = [m for m in sse(request(address, path)[2]) if "id" in m]
     resumed = [
-        m for m in sse(request(address, path, headers={"Last-Event-ID": "0:5"})[2]) if "id" in m
+        m
+        for m in sse(request(address, path, headers={"Last-Event-ID": f"{run}:0:5"})[2])
+        if "id" in m
     ]
-    assert resumed == full[6:]
-    ignored = sse(request(address, path, headers={"Last-Event-ID": "nonsense"})[2])
-    assert [m for m in ignored if "id" in m] == full
+    assert resumed == full[7:]
+    started = sse(request(address, path, headers={"Last-Event-ID": f"{run}:0:start"})[2])
+    assert [m for m in started if "id" in m] == full[1:]
+    for foreign in ("nonsense", "0:5", f"{'0' * 32}:0:5"):
+        status, headers, body = request(address, path, headers={"Last-Event-ID": foreign})
+        assert (status, body) == (204, b"")
+        assert headers["Cache-Control"] == "no-store"
+        assert headers["Content-Security-Policy"] == CSP
 
 
 @pytest.mark.parametrize(
@@ -148,20 +169,41 @@ def test_invalid_requests_get_short_json_errors(
     assert headers["Content-Security-Policy"] == CSP
 
 
+def _bodiless(address: tuple[str, int], method: str, path: str) -> tuple[int, bytes]:
+    """A request without the `Content-Length: 0` that http.client adds to POST, PUT and PATCH:
+    the server refuses any body framing with 400 before it looks at the method."""
+    connection = http.client.HTTPConnection(*address, timeout=60)
+    try:
+        connection.putrequest(method, path, skip_accept_encoding=True)
+        connection.endheaders()
+        response = connection.getresponse()
+        return response.status, b"" if method == "HEAD" else response.read()
+    finally:
+        connection.close()
+
+
 @pytest.mark.parametrize("method", ["POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"])
 def test_every_method_but_get_is_refused(address: tuple[str, int], method: str) -> None:
-    status, _, body = request(address, f"/matches/{MATCH}/timeline", method=method)
+    status, body = _bodiless(address, method, f"/matches/{MATCH}/timeline")
     assert status == 405
     if method != "HEAD":
         assert json.loads(body) == {"error": "read-only API"}
 
 
+def test_a_request_with_a_body_is_refused(address: tuple[str, int]) -> None:
+    status, headers, body = request(address, f"/matches/{MATCH}/timeline", method="POST")
+    assert status == 400 and json.loads(body) == {"error": "bad request"}
+    assert headers["Content-Security-Policy"] == CSP
+
+
 def test_streams_are_bounded() -> None:
     broadcast = app(max_streams=1)
-    assert broadcast.streams.acquire(blocking=False)
+    assert broadcast.streams.try_acquire()
     with serving(broadcast) as addr:
         status, _, body = request(addr, f"/matches/{MATCH}/stream")
+        broadcast.streams.release()
     assert status == 503 and json.loads(body) == {"error": "too many streams"}
+    assert broadcast.streams.active == 0
 
 
 def test_an_internal_error_reveals_nothing(monkeypatch: pytest.MonkeyPatch) -> None:

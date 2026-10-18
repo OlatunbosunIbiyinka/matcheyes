@@ -2,6 +2,7 @@
 
 import json
 import re
+import signal
 from pathlib import Path
 from typing import Any
 
@@ -9,6 +10,7 @@ import pytest
 
 import matcheyes.__main__ as cli
 from matcheyes.broadcast.contracts import CueTimeline
+from tests.api.support import fake_watchdog
 from tests.broadcast.support import timeline
 from tests.lifecycle.support import in_progress, reference
 from tests.support.builders import FIXTURE_DIR
@@ -55,19 +57,27 @@ def test_serve_starts_on_localhost_and_stops_cleanly(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     seen: dict[str, Any] = {}
+    calls: list[str] = []
 
     def interrupted(self: cli.BroadcastServer, *_: object) -> None:
         seen["address"] = self.server_address
         seen["apps"] = self.app
+        calls.append("serve")
         raise KeyboardInterrupt
 
     match = in_progress()
     monkeypatch.setattr(cli, "load_catalog", lambda _: {match.info.match_id: match})
     monkeypatch.setattr(cli.BroadcastServer, "serve_forever", interrupted)
+    fake_watchdog(monkeypatch, calls)
+    before = {s: signal.getsignal(s) for s in (signal.SIGTERM, signal.SIGINT)}
     assert cli.main(["serve", "unused", "--port", "0", "--speed", "0", "--no-loop"]) == 0
     assert seen["address"][0] == "127.0.0.1"
     assert list(seen["apps"].live) == [match.info.match_id]
-    assert "on http://127.0.0.1:" in capsys.readouterr().out
+    assert calls == ["arm", "serve", "cancel"]
+    assert {s: signal.getsignal(s) for s in before} == before
+    out = capsys.readouterr().out
+    assert "on http://127.0.0.1:" in out
+    assert f"run {seen['apps'].live[match.info.match_id].run}" in out
 
 
 @pytest.mark.parametrize(

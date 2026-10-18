@@ -208,7 +208,10 @@ def test_stats_and_editions_survive_the_server_resuming_mid_statistics() -> None
         at = next(i for i, m in enumerate(full) if m["event"] == "stats")
         resumed = sse(request(address, path, headers={"Last-Event-ID": full[at]["id"]})[2])
     assert [m for m in resumed if "id" in m] == full[at + 1 :]
-    assert [m["id"] for m in full] == [f"0:{i}" for i in range(len(full))]
+    run = full[0]["id"].split(":")[0]
+    assert [m["id"] for m in full] == [f"{run}:0:start"] + [
+        f"{run}:0:{i}" for i in range(len(full) - 1)
+    ]
     assert sum(m["event"] == "stats" for m in full) == len(reference().state.snapshots)
 
 

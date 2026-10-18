@@ -204,5 +204,8 @@ detected; clean reference investigations 1,262 with 0 flagged and 0 of 5,531 ass
 * Configuration B's leakage and auditor findings are unresolved (§4, §5).
 * Offline leak tracing cannot use call order (§6).
 * The smoke test was run three times; the gate passed on the third, after the approved change.
-* Azure Container Apps deployment has not been performed: it is blocked until every hard
-  invariant is resolved.
+* Azure Container Apps deployment has not been performed. Its gate applies to adopted
+  configuration B′ and the S05 recording pinned for the public demo (§8), which must
+  independently satisfy every applicable hard invariant (§3); configuration B remains rejected.
+  Provisioning remains blocked until the deployment artifact passes security and runtime
+  acceptance testing (ADR-0015, amendment of 2026-10-14).

@@ -168,6 +168,13 @@ performs no football reasoning. The decision is in
 [ADR-0014](decisions/0014-broadcast-cue-contract-and-live-presentation-surface.md) and the
 results in [stage8-evaluation.md](stage8-evaluation.md).
 
+Each `LiveMatch` has an explicit lifecycle (ready, replaying, paused, finished, failed, stopping,
+stopped, recording unavailable) and a random run identity. Stream message IDs carry the run, so
+a reconnect never splices two replays. `GET /health` is readiness (503 while any match cannot be
+served). Connections, request heads, streams and shutdown are bounded, and an in-process
+`faulthandler` watchdog ends a process whose accept loop stops ticking
+([ADR-0017](decisions/0017-replay-lifecycle-identity-and-serving-bounds.md)).
+
 ## Observable world vs hidden world
 
 ```
@@ -222,5 +229,7 @@ reached with Microsoft Entra ID, for recording and evaluation only. Microsoft Ag
 and Foundry Agent Service are not used: the fixed-sequence topology stays explicit
 ([ADR-0010](decisions/0010-agentic-investigation.md), [ADR-0015](decisions/0015-foundry-model-as-untrusted-reasoner.md)).
 A credential-free container image of the replay server exists (`Dockerfile`, `deploy/`); the
-planned host is Azure Container Apps with one replica, but it has not been deployed. Data store
-and eventing remain open.
+planned host is Azure Container Apps with **one replica max** (in-memory replay / run identity),
+optional scale-to-zero, and SSE-aware ingress idle timeout — see [`deploy/azure/`](../deploy/azure/README.md).
+Static UI and SSE stay on the same origin (no Static Web Apps split). Data store and eventing
+remain open.

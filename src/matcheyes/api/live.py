@@ -16,9 +16,18 @@ the snapshot's own prefix, never from its reasoning: from the validity report an
 analytics the evaluation already computed on that prefix when the evaluation cache holds them,
 otherwise from the event log. They are cached by snapshot ID without an edition; the edition is
 added when the message is formed.
+
+Lifecycle (ADR-0017): READY until the first request starts the replay, then REPLAYING and, when
+looping, PAUSED between editions; FINISHED after the last edition of a non-looping replay. An
+exception, an unexpected thread exit or a stall makes the match FAILED, which is sticky: nothing
+is published afterwards and only an operator recovers it. `stop()` moves it to STOPPING, then
+STOPPED once the thread has exited. A match whose recording is unusable starts, and stays,
+RECORDING_UNAVAILABLE. Each `LiveMatch` has a random 128-bit `run` identity for its lifetime.
 """
 
 import json
+import secrets
+import sys
 import threading
 import time
 from collections.abc import Callable
@@ -56,6 +65,21 @@ EVALUATION_CACHE_LIMIT = 400
 
 STATS_CACHE_LIMIT = EVALUATION_CACHE_LIMIT
 
+READY = "ready"
+REPLAYING = "replaying"
+PAUSED = "paused"
+FINISHED = "finished"
+FAILED = "failed"
+STOPPING = "stopping"
+STOPPED = "stopped"
+RECORDING_UNAVAILABLE = "recording_unavailable"
+FAILABLE = (READY, REPLAYING, PAUSED)
+SERVING = (READY, REPLAYING, PAUSED, FINISHED)
+STALL_SECONDS = 120.0
+"""Provisional, not a measured limit: an overdue event with no progress for this long fails."""
+
+STACK_FRAMES = 20
+
 SurfaceKey = tuple[Audience, Identifier | None]
 Evaluator = Callable[[Snapshot], SnapshotEvaluation]
 Analyse = Callable[[Snapshot], AnalysedEvaluation]
@@ -90,6 +114,8 @@ class Backend:
     evaluator: Evaluator | None = None
     reasoner: ReasonerIdentity = REFERENCE
     explainer: Explain | None = None
+    available: bool = True
+    """False when the pinned recording is unusable: the match is never replayed."""
 
 
 @dataclass
@@ -217,6 +243,59 @@ def _team(sheet: TeamSheet) -> TeamRef:
     return TeamRef(team_id=sheet.team_id, name=sheet.club.name, short_name=sheet.club.short_name)
 
 
+def _error_frames(error: BaseException) -> list[str]:
+    """The innermost frames of an exception's traceback, outermost first."""
+    rows: list[str] = []
+    tb = error.__traceback__
+    while tb is not None:
+        code = tb.tb_frame.f_code
+        rows.append(f"  {code.co_filename}:{tb.tb_lineno} in {code.co_name}")
+        tb = tb.tb_next
+    return rows[-STACK_FRAMES:]
+
+
+def _thread_frames(ident: int | None) -> list[str]:
+    """The innermost frames a running thread is in, outermost first."""
+    rows: list[str] = []
+    frame = sys._current_frames().get(ident) if ident is not None else None
+    while frame is not None:
+        code = frame.f_code
+        rows.append(f"  {code.co_filename}:{frame.f_lineno} in {code.co_name}")
+        frame = frame.f_back
+    return rows[:STACK_FRAMES][::-1]
+
+
+def _quantile(ordered: list[float], q: float) -> float:
+    return ordered[int(q * (len(ordered) - 1))] if ordered else 0.0
+
+
+@dataclass
+class EditionMetrics:
+    """What one edition's replay measured, logged once when the edition ends."""
+
+    began: float
+    steps: list[float] = field(default_factory=list)
+    max_gap: float = 0.0
+    max_lag: float = 0.0
+    end_lag: float = 0.0
+
+    def record(self, started: float, ended: float, previous: float, due: float) -> None:
+        self.steps.append(ended - started)
+        self.max_gap = max(self.max_gap, ended - max(previous, due))
+        self.end_lag = ended - due
+        self.max_lag = max(self.max_lag, self.end_lag)
+
+    def line(self, match_id: str, edition: int, pause_before: float, ended: float) -> str:
+        ordered = sorted(self.steps)
+        return (
+            f"replay edition: {match_id} edition {edition} events {len(ordered)} "
+            f"seconds {ended - self.began:.3f} pause_before {pause_before:.3f} "
+            f"ingest_p50 {_quantile(ordered, 0.5):.4f} ingest_p99 {_quantile(ordered, 0.99):.4f} "
+            f"ingest_max {_quantile(ordered, 1.0):.4f} max_progress_gap {self.max_gap:.3f} "
+            f"max_lag {self.max_lag:.3f} end_lag {self.end_lag:.3f}\n"
+        )
+
+
 class LiveMatch:
     def __init__(
         self,
@@ -228,12 +307,18 @@ class LiveMatch:
         reasoner: ReasonerIdentity = REFERENCE,
         explainer: Explain | None = None,
         stats: bool = True,
+        stall_seconds: float = STALL_SECONDS,
+        available: bool = True,
     ) -> None:
         """`speed`: match seconds per wall second; 0 replays as fast as possible.
         `reasoner` names who reasoned (presentation only); `explainer` shows a revision's work.
-        `stats` publishes snapshot statistics; off only to measure their cost."""
+        `stats` publishes snapshot statistics; off only to measure their cost.
+        `stall_seconds`: how long an overdue event may make no progress before the match fails.
+        `available`: False when its recording is unusable; it is then never replayed."""
         if speed < 0:
             raise ValueError("speed must be non-negative")
+        if stall_seconds <= 0:
+            raise ValueError("stall_seconds must be positive")
         self.match = match
         self.speed = speed
         self.loop = loop
@@ -255,6 +340,15 @@ class LiveMatch:
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self.replay_seconds: list[float] = []
+        self.run = secrets.token_hex(16)
+        self.stall_seconds = stall_seconds
+        self.state = READY if available else RECORDING_UNAVAILABLE
+        self.failure: str | None = None
+        now = time.monotonic()
+        self.due_at = self.last_progress = now
+        self.pause_until = now
+        self.ingested = 0
+        self._pause_before = 0.0
 
     def _edition(self, number: int, workspaces: WorkspaceCache) -> Edition:
         return Edition(
@@ -272,46 +366,118 @@ class LiveMatch:
         return key
 
     def start(self) -> None:
+        """Start the replay on first use; does nothing in any state but READY."""
+        line = None
         with self.condition:
-            if self._thread is None:
-                self._thread = threading.Thread(target=self._run, daemon=True)
+            if self.state != READY or self._thread is not None:
+                return
+            self._set(REPLAYING)
+            self._thread = threading.Thread(target=self._run, daemon=True)
+            try:
                 self._thread.start()
+            except RuntimeError as error:
+                line = self._fail_locked("thread_exited", error)
+        if line is not None:
+            sys.stderr.write(line)
 
-    def stop(self) -> None:
+    def request_stop(self) -> None:
+        """Ask the replay to stop, without waiting for it."""
         self._stop.set()
         with self.condition:
+            if self.state not in (FAILED, RECORDING_UNAVAILABLE, STOPPED):
+                self._set(STOPPING)
             self.condition.notify_all()
-        if self._thread is not None:
-            self._thread.join(timeout=30)
+
+    def join(self, timeout: float) -> bool:
+        """Wait up to `timeout` for the replay thread; True once it has exited (or never ran)."""
+        thread = self._thread
+        if thread is not None:
+            thread.join(max(0.0, timeout))
+            if thread.is_alive():
+                return False
+        with self.condition:
+            if self.state == STOPPING:
+                self._set(STOPPED)
+        return True
+
+    def stop(self, timeout: float = 30.0) -> bool:
+        self.request_stop()
+        return self.join(timeout)
 
     @property
     def stopped(self) -> bool:
         return self._stop.is_set()
 
+    @property
+    def serving(self) -> bool:
+        """Whether streams, timelines and explanations may be served from this match."""
+        return self.state in SERVING
+
+    def _set(self, state: str) -> None:
+        self.state = state
+        self.condition.notify_all()
+
     def _run(self) -> None:
         number = 0
-        while not self._stop.is_set():
-            self._replay(number)
-            if not self.loop or self._stop.wait(self.pause):
-                return
-            number += 1
+        try:
+            while not self._stop.is_set():
+                self._replay(number)
+                with self.condition:
+                    if self.state != REPLAYING or self._stop.is_set():
+                        return
+                    if not self.loop:
+                        self._set(FINISHED)
+                        return
+                    paused = time.monotonic()
+                    self.pause_until = paused + self.pause
+                    self._set(PAUSED)
+                if self._stop.wait(self.pause):
+                    return
+                with self.condition:
+                    if self.state != PAUSED:
+                        return
+                    self._pause_before = time.monotonic() - paused
+                    self._set(REPLAYING)
+                number += 1
+        except Exception as error:
+            self.fail("replay_error", error)
+        except BaseException as error:
+            self.fail("thread_exited", error)
+            raise
+        finally:
+            if not self._stop.is_set():
+                self.fail("thread_exited")
+
+    def _halted(self) -> bool:
+        """Under `condition`: whether nothing may be published any more."""
+        return self.state in (FAILED, STOPPING, STOPPED)
 
     def _replay(self, number: int) -> None:
         workspaces: WorkspaceCache = {}
         edition = self._edition(number, workspaces)
+        began = time.monotonic()
+        metrics = EditionMetrics(began)
         with self.condition:
+            if self._halted():
+                return
             self.edition = edition
+            self.ingested = 0
+            self.due_at = self.last_progress = began
             self.condition.notify_all()
         engine = LifecycleEngine(self.match.info, self.evaluator)
-        began = time.monotonic()
         snapshots = 0
         for event, at in zip(self.events, self.times, strict=True):
             if self.speed > 0:
-                delay = began + at / self.speed - time.monotonic()
+                due = began + at / self.speed
+                self.due_at = due
+                delay = due - time.monotonic()
                 if delay > 0 and self._stop.wait(delay):
                     return
             elif self._stop.is_set():
                 return
+            else:
+                due = self.due_at = time.monotonic()
+            started = time.monotonic()
             engine.ingest(event)
             state, prefix = engine.state, engine.log.events()
             data_status = engine.status().data_status
@@ -320,6 +486,10 @@ class LiveMatch:
                 for key, s in edition.surfaces.items()
             }
             workspaces.clear()
+            ended = time.monotonic()
+            metrics.record(started, ended, self.last_progress, due)
+            self.last_progress = ended
+            self.ingested += 1
             tick = None
             stats: list[str] = []
             if len(state.snapshots) > snapshots:
@@ -331,9 +501,11 @@ class LiveMatch:
                         stats_message(number, self._stats(self.stats_cache, r.header, engine.log))
                         for r in closed
                     ]
-            if tick is None and not any(new.values()):
-                continue
             with self.condition:
+                if self._halted():
+                    return
+                if tick is None and not any(new.values()):
+                    continue
                 edition.state = state
                 for key, s in edition.surfaces.items():
                     if tick is not None:
@@ -346,9 +518,89 @@ class LiveMatch:
                     s.watermark, s.snapshots = s.compiler.watermark, s.compiler.snapshots
                 self.condition.notify_all()
         with self.condition:
+            if self._halted():
+                return
             edition.done = True
-            self.replay_seconds.append(time.monotonic() - began)
+            ended = time.monotonic()
+            self.replay_seconds.append(ended - began)
             self.condition.notify_all()
+        mid = self.match.info.match_id
+        sys.stderr.write(metrics.line(mid, number, self._pause_before, ended))
+
+    def fail(self, category: str, error: BaseException | None = None) -> bool:
+        """Make the match FAILED (sticky) from READY, REPLAYING or PAUSED; only the first call
+        transitions and logs. The log line goes to stderr, never into an HTTP response."""
+        with self.condition:
+            line = self._fail_locked(category, error)
+        if line is not None:
+            sys.stderr.write(line)
+        return line is not None
+
+    def _fail_locked(self, category: str, error: BaseException | None) -> str | None:
+        if self.state not in FAILABLE:
+            return None
+        self._set(FAILED)
+        self.failure = category
+        thread = self._thread
+        if error is not None:
+            frames = _error_frames(error)
+        elif category == "stalled" and thread is not None:
+            frames = _thread_frames(thread.ident)
+        else:
+            frames = []
+        kind = "" if error is None else f" {type(error).__name__}"
+        head = (
+            f"replay failed: {self.match.info.match_id} edition {self.edition.number} "
+            f"event {self.ingested}/{len(self.events)} category={category}{kind}"
+        )
+        return "".join(f"{row}\n" for row in (head, *frames))
+
+    def _problem(self, now: float) -> str | None:
+        """Under `condition`: the failure a passive check sees, if any."""
+        thread = self._thread
+        if self.state not in (REPLAYING, PAUSED):
+            return None
+        if thread is not None and not thread.is_alive():
+            return "thread_exited"
+        if self.state == PAUSED:
+            return "stalled" if now > self.pause_until + self.stall_seconds else None
+        gap = now - max(self.last_progress, self.due_at)
+        return "stalled" if gap > self.stall_seconds else None
+
+    def check_progress(self) -> bool:
+        """The passive stall and thread check; True if the match is (now) FAILED."""
+        line = None
+        with self.condition:
+            problem = self._problem(time.monotonic())
+            if problem is not None:
+                line = self._fail_locked(problem, None)
+            failed = self.state == FAILED
+        if line is not None:
+            sys.stderr.write(line)
+        return failed
+
+    def health(self, deadline: float) -> str | None:
+        """Why this match is not ready (`replay`, `recording`, `stopping`), or None if it is.
+        Waits for the lock no later than `deadline`; a lock held past it counts as `replay`."""
+        if not self.condition.acquire(timeout=max(0.0, deadline - time.monotonic())):
+            return "replay"
+        line = None
+        try:
+            problem = self._problem(time.monotonic())
+            if problem is not None:
+                line = self._fail_locked(problem, None)
+            state = self.state
+        finally:
+            self.condition.release()
+        if line is not None:
+            sys.stderr.write(line)
+        reasons = {
+            FAILED: "replay",
+            RECORDING_UNAVAILABLE: "recording",
+            STOPPING: "stopping",
+            STOPPED: "stopping",
+        }
+        return reasons.get(state)
 
     def _stats(self, cache: StatsCache, header: SnapshotHeader, log: EventLog) -> SnapshotStats:
         """The statistics of a closed snapshot, from its own prefix in the log. Anything that

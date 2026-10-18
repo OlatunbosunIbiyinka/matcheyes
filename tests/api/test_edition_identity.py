@@ -1,11 +1,11 @@
-"""Known issue: edition numbers do not identify a server process (docs/known-issues.md).
+"""Edition identity covers the server process: another run's stream is never resumed (ADR-0017).
 
 A browser that loses its stream reconnects with the `Last-Event-ID` of the last message it
-received, `edition:index`. If the server restarted in between with different content for the same
-match (here, one event removed), its edition 0 has the same number, so the stream resumes after
-`index` of the new content without any signal to rebuild. The client is left with the old messages
-up to `index` followed by the new ones: a mixture of two replays. This test states the correct
-outcome and is expected to fail until edition identity covers the server process.
+received, `run:edition:index`. Every server process gives each match a new random run, so after a
+restart, with the same content or a data correction (here, one event removed), the resume names
+another run: the server answers 204, the browser's stream closes, and a new stream (which sends no
+`Last-Event-ID`) rebuilds the page from the new run's start. No client can hold a mixture of two
+replays.
 """
 
 import pytest
@@ -26,37 +26,25 @@ def _revised() -> ObservableMatch:
     return match.model_copy(update={"events": match.events[:half] + match.events[half + 1 :]})
 
 
-def _client_view(received: list[dict[str, str]], resumed: list[dict[str, str]]) -> list[str]:
-    """What a page holds after resuming: it rebuilds only when the edition number changes."""
-    view = [m["data"] for m in received if "id" in m]
-    edition = next(m["data"] for m in received if m.get("event") == "edition")
-    for m in resumed:
-        if m.get("event") == "edition" and m["data"] != edition:
-            view, edition = [], m["data"]
-        elif "id" in m:
-            view.append(m["data"])
-    return view
-
-
-@pytest.mark.xfail(
-    strict=True,
-    raises=AssertionError,
-    reason="known issue: edition numbers restart with the server",
-)
-def test_a_restarted_server_makes_a_resuming_client_rebuild() -> None:
+@pytest.mark.parametrize("revised", [False, True], ids=["same-content", "corrected-content"])
+def test_a_restarted_server_makes_a_resuming_client_rebuild(revised: bool) -> None:
     before = app()
     with serving(before) as address:
         before.live[MATCH].start()
         wait_done(before.live[MATCH])
         old = sse(request(address, PATH)[2])
-    after = BroadcastApp({MATCH: _revised()}, speed=0, loop=False)
+    after = BroadcastApp({MATCH: _revised() if revised else in_progress()}, speed=0, loop=False)
     with serving(after) as address:
         after.live[MATCH].start()
         wait_done(after.live[MATCH])
         new = sse(request(address, PATH)[2])
         old_ids = [m for m in old if "id" in m]
-        new_ids = [m for m in new if "id" in m]
-        differs = next(i for i, (a, b) in enumerate(zip(old_ids, new_ids, strict=False)) if a != b)
-        received = old[: old.index(old_ids[differs]) + 1]
-        resumed = sse(request(address, PATH, headers={"Last-Event-ID": old_ids[differs]["id"]})[2])
-    assert _client_view(received, resumed) == [m["data"] for m in new_ids]
+        for last in (old_ids[0], old_ids[len(old_ids) // 2], old_ids[-1]):
+            status, _, body = request(address, PATH, headers={"Last-Event-ID": last["id"]})
+            assert (status, body) == (204, b"")
+        assert after.streams.active == 0
+        rebuilt = sse(request(address, PATH)[2])
+    assert rebuilt == new
+    runs = {m["id"].split(":")[0] for m in rebuilt if "id" in m}
+    assert runs == {after.live[MATCH].run}
+    assert after.live[MATCH].run != before.live[MATCH].run

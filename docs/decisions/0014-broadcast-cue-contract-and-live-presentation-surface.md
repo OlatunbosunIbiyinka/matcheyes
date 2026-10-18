@@ -216,3 +216,15 @@ of synthetic, fictional matches over SSE, not production real-time broadcasting.
   event log, which maps onto a partitioned event store; its output is an append-only, content-
   addressed cue stream that a CDN or pub/sub fan-out can serve unchanged. Content addressing
   makes republishing idempotent. These are later decisions, to be recorded when evidence exists.
+
+## Amendment: serving lifecycle and bounds (2026-10-15)
+
+[ADR-0017](0017-replay-lifecycle-identity-and-serving-bounds.md) refines the API boundary without
+changing the endpoint list or the cue contract:
+
+* `GET /health` is readiness. It answers 503 with a reason (`replay`, `recording` or `stopping`)
+  while any match cannot be served.
+* Connections, request heads, streams and shutdown are bounded. Each connection carries one
+  request, and request bodies are refused.
+* The API's standard-library allow-list adds `secrets` (run identity) and `io.BytesIO` (head
+  parsing). `FileIO` is banned like the other write calls.
