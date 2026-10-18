@@ -227,7 +227,7 @@ function heroEvent(kind, teamId, at) {
   list.hidden = false;
 }
 
-// --- Match Story ------------------------------------------------------------------------------
+// --- What the Match Reveals -------------------------------------------------------------------
 
 function setFeedStatus(status, text) {
   const node = $("feed-status");

@@ -104,14 +104,21 @@ def test_the_frontend_mirrors_the_statistics_contract() -> None:
 
 
 def test_the_statistics_section_sits_in_the_match_centre_without_markers() -> None:
-    # Match Story (main) is primary; chart and Stat Ledger follow as supporting context.
-    main, chart, stats = (HTML.index(s) for s in ("<main", 'id="chart"', 'id="stats"'))
-    assert main < chart < stats
+    # Match Timeline → The Stat Ledger → What the Match Reveals (main).
+    chart, stats, main = (HTML.index(s) for s in ('id="chart"', 'id="stats"', "<main"))
+    assert chart < stats < main
+    assert 'class="match-centre"' in HTML
+    assert HTML.index('class="match-centre"') < chart
+    css = (STATIC / "app.css").read_text(encoding="utf-8")
+    assert "flex-direction: column" in css
+    # Full-width timeline: never place ledger beside the chart.
+    assert not re.search(r"\.match-centre\s*\{[^}]*grid-template-columns", css, re.S)
     section = HTML[stats : HTML.index("</section>", stats)]
     assert 'role="table"' in section and 'aria-labelledby="stats-heading"' in section
     assert "The Stat Ledger" in section
     assert "Statistical context only" in section or "context only" in section.lower()
     assert "not" in section.lower() and "automatically verified insights" in section
+    assert "not proof" in section.lower() or "not linked" in section.lower()
     assert "<svg" not in section
 
 
@@ -254,19 +261,25 @@ def test_the_live_driver_reaches_analytics_only_through_the_statistics_contract(
     assert not any(m.startswith("matcheyes.analytics") for m in modules)
 
 
-def test_stage10_chrome_uses_glossary_labels_and_rejects_intelligence_changes() -> None:
-    """Gate B product language: chrome labels only; no overclaim strings."""
+def test_stage10_chrome_uses_glossary_labels_and_rejects_retired_names() -> None:
+    """Stage 10 chrome: glossary labels only; no retired or overclaim strings."""
     assert "See beyond the score" in HTML
     assert 'id="hero-brand-title"' in HTML and "MatchEyes" in HTML
-    assert "Match Story" in HTML
+    assert "Match Timeline" in HTML
+    assert "What the Match Reveals" in HTML
     assert "On-Pitch Record" in HTML
     assert "Verified Analysis" in HTML
     assert "The Stat Ledger" in HTML
     assert "Trace the Evidence" in HTML and "Trace the Evidence" in JS
+    assert "Match Story" not in HTML
     assert "Intelligence Changes" not in HTML and "Intelligence Changes" not in JS
     assert "not" in HTML.lower() and "automatically verified insights" in HTML
-    assert " support" in HTML and 'id="chart"' in HTML and 'id="stats"' in HTML
-    assert HTML.index("<main") < HTML.index('id="chart"') < HTML.index('id="stats"')
+    assert 'href="#chart-heading"' in HTML and "Skip to the Match Timeline" in HTML
+    assert 'id="story-heading"' in HTML  # internal id retained
+    assert "chart-primary" in HTML
+    assert "match-centre" in HTML
+    assert " support" in HTML and 'id="stats"' in HTML
+    assert HTML.index('id="chart"') < HTML.index('id="stats"') < HTML.index("<main")
     assert "BANNER_STATES" in JS
     for state in (
         "connecting", "replaying", "reconnecting", "complete", "unavailable", "paused", "reloading",

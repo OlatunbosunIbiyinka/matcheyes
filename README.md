@@ -61,7 +61,7 @@ real-time model inference or multi-region broadcasting.
 | 7 | Snapshot-anchored insight lifecycle: event log with contiguous watermark, one canonical snapshot per closed minute, storylines with append-only revisions, lifecycle audit, replay evaluation (no corrections, no streaming infrastructure) | Done |
 | 8 | Broadcast cue contract and live match surface: moment / insight / revision / retraction / status cues, deterministic selection, one server-owned replay per match, read-only stdlib HTTP + SSE, CSP static page (no Foundry, no Azure) | Done |
 | 9 | Foundry model behind the reasoning boundary: strict wire schemas, Entra auth, held-out evaluation of the real model (model as Investigator rejected on measured evidence; model as Challenger adopted), recorded runs replayed publicly, read-only show-your-work, credential-free container image on Azure Container Apps (`deploy/azure/`; open findings in [stage9-evaluation.md](docs/stage9-evaluation.md)) | In review |
-| 10 | Product UX and hackathon polish: redesigned replay page (editorial match hero, Match Story, separate match-event and analysis timelines, contextual evidence disclosures, accessible replay states; presentation only) | In progress |
+| 10 | Product UX and hackathon polish: redesigned replay page (editorial match hero, Match Timeline, What the Match Reveals, separate On-Pitch Record and Verified Analysis, Trace the Evidence, Stat Ledger, accessible replay states; presentation only) | In progress |
 | 11 | Final submission | Not started |
 
 ## Quick start

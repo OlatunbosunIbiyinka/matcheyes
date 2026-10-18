@@ -1,8 +1,9 @@
 # Stage 10 UI plan: replay presentation polish
 
-Status: **plan only** (not yet implemented). Source of truth: Stage 10 UI audit of
-`main` at documentation time, plus the Stage 10 differentiation review (read-only). The
-public surface already serves Stage 8/9 cues plus Stage 10.3 statistics. This document does
+Status: **active product plan** (Gate A landed; Gate B chrome landed on `main` at
+`9c73d82`; this revision records **Match Timeline → The Stat Ledger → What the Match Reveals**
+before a separate commit). Source of truth: Stage 10 UI audit, differentiation review, Gate B,
+plus the **What the Match Reveals** / ledger-after-graph product decisions. This document does
 **not** change ADRs, cue contracts, API schemas, or acceptance thresholds.
 
 Related decisions (unchanged):
@@ -21,7 +22,8 @@ file).
 **Naming caveat:** Product chrome labels below are presentation choices only. Trademark
 availability, legal clearance, and uniqueness versus the broader hackathon gallery or other
 products have **not** been established. This plan does **not** claim they are cleared or
-globally unique. Do not use **“Intelligence Changes”** as a preferred label.
+globally unique. Do not use **“Intelligence Changes”** or **“Match Story”** as preferred
+user-visible labels.
 
 ---
 
@@ -29,10 +31,18 @@ globally unique. Do not use **“Intelligence Changes”** as a preferred label.
 
 **MatchEyes — See beyond the score.**
 
-MatchEyes shows what the score cannot: evidence-backed analysis, its verification status
-(proposed vs verified, and when conclusions are revised or retracted), and how those
-conclusions change over the match. The primary demo journey is **Match Story → Trace the
-Evidence**. The chart and **The Stat Ledger** are supporting context, not the product centre.
+MatchEyes helps viewers understand **what happened**, **what the available evidence
+reveals**, and **why an analytical conclusion deserves its verification status** (proposed
+vs verified, and when conclusions are revised or retracted).
+
+The primary visual journey is **Match Timeline → The Stat Ledger → What the Match Reveals →
+Trace the Evidence**, beneath brand and fixture. **The Stat Ledger** is immediate quantitative
+match context after the graph—not proof of an insight and not the product centre.
+
+**Product decision (hierarchy):** visualisation first, then statistics beside/after it for
+context, then the analytical narrative. This is presentation only. It does **not** change the
+truth pipeline, cue authority, verifier gates, or server behaviour. Statistics after the graph
+must not be read as causal proof of findings below.
 
 Presentation labels rename chrome only. They must not overclaim verification: proposed
 findings stay distinguishable from verified findings; revisions and retractions keep their
@@ -43,26 +53,66 @@ existing cue semantics.
 ## Product language glossary (chrome only)
 
 Internal identifiers (`moment`, `insight`, `revision`, `retraction`, `status`, `stats`,
-`run`, `tone`, cue IDs) stay as today. Only user-visible strings change under Gate B.
+`run`, `tone`, `#story-heading`, cue IDs) stay as today unless a rename is technically
+required. Prefer updating user-visible strings alone.
 
-| Presentation label | UI surface (today → target) | Underlying concept | Must not imply |
+| Presentation label | UI surface | Underlying concept | Must not imply |
 | --- | --- | --- | --- |
 | **MatchEyes — See beyond the score** | Title / topbar tagline; hero-level brand | Product identity | That the page invents tactics or overrides the score |
-| **Match Story** | `#story-heading`, briefing, insight cards | Verified (and living) Stage 6/7/8 insight cues | That every card is causal proof without opening Trace |
-| **On-Pitch Record** | Aside lane “Match events”; chart event rail copy | `cue.kind === "moment"` (goals, cards, subs, periods) | Official league record, or planted hidden-world truth |
-| **Verified Analysis** | Aside lane “Analysis updates”; analysis chart lane | Insight / revision / retraction cues | That every row is verified before the verifier ran; erase proposed / revised / retracted |
-| **The Stat Ledger** | `#stats-heading` “Team statistics” | ADR-0016 `stats` SSE; snapshot-anchored measures | That ledger figures are automatically verified insights or cue strength |
-| **Trace the Evidence** | Card disclosure “Evidence and verification” / planned “Show the work” | `GET .../storylines/.../revisions/{n}` → `work_rows` | That proposed reasoner rows equal verified conclusions |
+| **Match Timeline** | Primary visualisation (`#chart-heading`; existing SVG graph) | Snapshot-anchored on-pitch marks + analysis publication marks from cues/clock | Ball tracking, player positions, or event clocks more precise than snapshot close |
+| **What the Match Reveals** | `#story-heading`, briefing, insight cards | Verified (and living) Stage 6/7/8 insight cues | That every card is causal proof without opening Trace |
+| **On-Pitch Record** | Aside lane; chart event rail copy | `cue.kind === "moment"` (goals, cards, subs, periods) | Official league record, or planted hidden-world truth |
+| **Verified Analysis** | Aside lane; analysis chart lane | Insight / revision / retraction cues | That every row is verified before the verifier ran; erase proposed / revised / retracted |
+| **The Stat Ledger** | `#stats-heading` | ADR-0016 `stats` SSE; snapshot-anchored measures | That ledger figures are automatically verified insights or cue strength |
+| **Trace the Evidence** | Card disclosure summary | `GET .../storylines/.../revisions/{n}` → `work_rows` | That proposed reasoner rows equal verified conclusions |
 
-**Rejected label:** “Intelligence Changes” — too ambiguous for a first-time judge; do not use.
+**Rejected / retired preferred labels:**
+
+- **“Intelligence Changes”** — too ambiguous for a first-time judge; do not use.
+- **“Match Story”** — retired as a preferred user-visible product label; replaced by
+  **What the Match Reveals**. Internal ids such as `#story-heading` may remain.
 
 **Helper copy required for The Stat Ledger:** statistics are **context only** and are **not**
-automatically verified insights (retain and strengthen today’s “context only / not linked to
-match events or insights” meaning).
+automatically verified insights.
 
 **Status distinctions retained (not renamed away):** proposed vs verified tones in Trace rows;
 published / revised / retracted insight lifecycle; existing verdict and integrity labels on
 cards.
+
+---
+
+## Revised information hierarchy
+
+Product decision (presentation only):
+
+1. **MatchEyes identity and fixture context** (hero: brand, competition, teams, score,
+   minute, replay state).
+2. **Match Timeline** — the existing match visualisation and replay position (primary visual
+   anchor, not a decorative inset chart).
+3. **The Stat Ledger** — existing team statistics immediately after the graph as supporting
+   quantitative context (not automatically verified insights; not proof of an insight).
+4. **What the Match Reveals** — evolving analytical narrative (briefing + insight cards).
+5. **Trace the Evidence** — evidence inspection on each finding (not relocated away from the
+   card).
+
+**Layout:** Match Timeline is always full content width; The Stat Ledger always stacks
+**directly below** it (no side-by-side at any breakpoint). DOM / reading order remains
+**chart → stats → narrative** in all breakpoints.
+
+Keep On-Pitch Record and Verified Analysis markers distinguishable on the timeline. Make the
+connection between timeline developments and analytical findings clear **using existing data
+only** (shared minute labels / snapshot mapping already on the page)—do not invent causal
+links the server does not establish, and do not imply that ledger figures prove a finding.
+
+Narrative and evidence must remain easy to reach (nearby in the page flow; skip link and
+focus targets preserved or retargeted thoughtfully). Preserve responsive layout and
+accessibility.
+
+**Visualisation honesty:** the current graph is a **snapshot-anchored timeline** (event marks
+at snapshot close; analysis marks at publication mapping). It is **not** pitch tracking. Do
+not simulate ball coordinates, player positions, or finer clocks. If a richer pitch animation
+is desired later, it requires data the server does not provide today—retain this supported
+visualisation.
 
 ---
 
@@ -72,16 +122,17 @@ Make the existing replay page judge-ready through **presentation-only** changes 
 visitor can:
 
 1. Recognise **MatchEyes — See beyond the score** and the **fixture** in the first viewport.
-2. Follow the developing **Match Story** (verified insights and how they change) in match time.
-3. Tell **On-Pitch Record** apart from **Verified Analysis**.
-4. Open **Trace the Evidence** and inspect verifier-authoritative vs proposed rows from the
-   server — the defining product gesture.
-5. Always see what the **replay system** is doing—including connect, pause, reconnect,
+2. Read the **Match Timeline** as the main visual of what happened in match time.
+3. Consult **The Stat Ledger** next as context only (not verified insight strength).
+4. Follow **What the Match Reveals**, then open **Trace the Evidence**.
+5. Tell **On-Pitch Record** apart from **Verified Analysis**.
+6. Always see what the **replay system** is doing—including connect, pause, reconnect,
    complete, restart, and unavailable—without the page inventing truth.
 
-Success criterion: a judge understands the match, the story, the evidence trail, and the
-connection state even when the stream drops; the browser never becomes an authority on
-football facts; the surface does not read as a generic stats dashboard.
+Success criterion: a judge understands the match visualisation, the analytical narrative, the
+evidence trail, and the connection state even when the stream drops; the browser never
+becomes an authority on football facts; the surface does not read as a generic stats
+dashboard or AI chat.
 
 ---
 
@@ -98,16 +149,19 @@ Presentation layer only:
 | `src/matcheyes/api/static/app.js` | Wiring of existing server fields only; chrome string updates |
 | Architecture / static tests that **pin** presentation strings and allowlists | Regression |
 | This plan; later `stage10-evaluation.md` | Documentation |
+| `README.md` stage table chrome wording (optional, keep in sync) | Docs |
 
 ### Out of scope
 
 - Backend behaviour, cue kinds, `BROADCAST_VERSION`, stats schema, verifier gates
 - Live Foundry / `MATCHEYES_LLM_*` on the public path
 - Azure resource changes, image rebuild, or deploy (see [UI vs deployment](#ui-implementation-vs-deployment-approval))
-- Inventing match facts, metrics, confidence values, timestamps, evidence, or fixture details
-- CDN fonts/scripts or any CSP relaxation
+- Inventing match facts, metrics, confidence values, timestamps, evidence, fixture details,
+  ball/player tracking, or event–insight causal links the API does not send
+- New graphing libraries, CDN fonts/scripts, or any CSP relaxation
 - Changing SSE event types, run-identity rules, or Trace-the-Evidence authority order
 - Renaming internal API fields or cue `kind` / `tone` values
+- Amending or rewriting the Gate B commit; this revision is a **separate** change
 
 ---
 
@@ -119,24 +173,23 @@ Presentation layer only:
 competition / teams / score / minute from server data only. The score remains visible context;
 the thesis is what lies beyond it.
 
-### 2. Match Story / chronological insight flow
+### 2. Match Timeline as primary visual anchor
 
-**Intent:** **Match Story** (briefing + insight cards) is the primary narrative spine —
-verified insights and how they change in match time—not a disconnected feed. Chart and Stat
-Ledger stay secondary.
+**Intent:** The existing SVG timeline is the main visual of the match—replay position,
+On-Pitch Record marks, and Verified Analysis publication marks—honest about snapshot-close
+vs analysis timing. Not a demoted decorative chart.
 
-### 3. Separate On-Pitch Record and Verified Analysis
+### 3. What the Match Reveals (analytical narrative)
 
-**Intent:** Moments stay factual on-pitch events (**On-Pitch Record**); insight / revision /
-retraction stay **Verified Analysis** (with proposed / verified / revised / retracted
-distinctions intact). Chart and aside must not blur those roles.
+**Intent:** Briefing + insight cards explain what the evidence reveals as the match develops.
+Newest-first card order may remain if it preserves cue integrity; do not invent chronology.
+Trace the Evidence stays the defining disclosure on each finding.
 
-### 4. Expandable Trace the Evidence (primary demo)
+### 4. Separate On-Pitch Record and Verified Analysis
 
-**Intent:** Disclosure summary **Trace the Evidence**; clear loading / unavailable / stale
-states; rows from `GET .../storylines/.../revisions/{n}` only; **verified tones above
-proposed**; revisions and retractions keep existing semantics. This journey is the defining
-product experience, not an optional footnote.
+**Intent:** Moments stay factual on-pitch events; insight / revision / retraction stay
+Verified Analysis (with proposed / verified / revised / retracted distinctions intact).
+Chart and aside must not blur those roles.
 
 ### 5. Accessible loading, reconnect, completion, restart, and error states
 
@@ -145,90 +198,72 @@ paused, reconnecting, reloading, complete, unavailable, and server restart (new 
 
 ---
 
-## Current implementation
+## Current implementation (post–Gate B baseline)
 
 Single-page surface served under a strict CSP
 (`default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'`
 in `api/server.py`). The page renders cue sections with `textContent` only and applies
 show / expire / supersede rules; it computes nothing about the match.
 
-| Area | Location | Behaviour today |
+| Area | Location | Behaviour (Gate B) |
 | --- | --- | --- |
-| Brand | `index.html` topbar | Wordmark + tagline “See beyond the score” at nav scale |
-| Hero / fixture | `.hero`, `selectMatch` in `app.js` | Teams, crests, meta (`competition` · matchday · venue), score from moment cues, clock from `clock` events, `#replay-state` |
-| Match Story | `#story-heading`, `#briefing`, `#cards` | Briefing (key moments / analysis now) + newest-first insight cards; empty state explains the verifier gate |
-| Event vs analysis | Aside lanes + chart | Toggle “Match events” / “Analysis updates”; chart note states snapshot-close placement vs analysis publication |
-| Evidence disclosure | Card `<details class="disclosure work">` | Summary “Evidence and verification”; `showWork` fetches revision rows; run guard; stale revision notice; proposed vs verified tones |
-| Stats | `#stats` | “Team statistics”; context-only note already present |
-| Replay states | `REPLAY_TEXT`, `#connection`, pause/hold | `connecting`, `replaying`, `reconnecting`, `complete`, `unavailable`, `paused`, `reloading`; `#announcer` / `#alerts` live regions |
-| Stream | `EventSource` | `edition` (with `run`), `clock`, `stats`, `cue`, `end`, `unavailable`; no `Last-Event-ID` on new connect (full rebuild) |
-| Fixture API | `GET /matches` | `match_id`, `competition`, `matchday`, `venue`, `synthetic`, `home`/`away` `{team_id,name,short_name}`, `reasoner` |
-| Work API | `GET /matches/{id}/storylines/{sid}/revisions/{n}` | `edition`, `run`, `rows` (`section`, `label`, `text`, `tone`) from `lifecycle/explain.work_rows` |
+| Brand | `index.html` topbar + hero | Wordmark + tagline “See beyond the score” |
+| Hero / fixture | `.hero`, `selectMatch` in `app.js` | Teams, crests, meta, score, clock, `#replay-state` |
+| Narrative | `#story-heading`, `#briefing`, `#cards` | Was labelled “Match Story”; briefing + newest-first cards |
+| Visualisation | `#chart` SVG | Snapshot-close on-pitch marks; analysis publication lane; was placed after `<main>` and marked supporting |
+| Event vs analysis | Aside lanes + chart | On-Pitch Record / Verified Analysis |
+| Evidence disclosure | Card `<details class="disclosure work">` | Trace the Evidence; run guard; proposed vs verified tones |
+| Stats | `#stats` | The Stat Ledger; context-only / not automatically verified insights |
+| Replay states | `REPLAY_TEXT`, `#connection`, pause/hold | Listed states; live regions |
+| Stream | `EventSource` | `edition` (with `run`), `clock`, `stats`, `cue`, `end`, `unavailable` |
+| Work API | `GET .../revisions/{n}` | Server `rows` only |
 
 **Event time vs analysis publication time (already exposed):**
 
 - On-pitch marks use each cue’s `snapshot_id` mapped through clock ticks to a
-  **minute label at snapshot close**, not an invented exact event clock. The chart note in
-  `index.html` already states this.
+  **minute label at snapshot close**, not an invented exact event clock.
 - Insight / revision / retraction cards use the same minute map for “Published …” /
   “updated …”. Do not invent a second timestamp the API does not send.
 
 **Existing Stage 10-related tests to preserve:**
 
-- `tests/architecture/test_stage10_serving.py` — stream listeners, stats field allowlist
-- `tests/architecture/test_stage10_stats.py` — stats contract digests
-- `tests/architecture/test_replay_controls.py` — single receive path, hold/resume, run reset,
-  show-work run check, pause control a11y
-- `tests/architecture/test_stage8_security.py` — no `innerHTML`, CSP-compatible surface
-
-Much of the structural Stage 10 checklist is **already built**. Remaining work is hierarchy,
-product language, and making Trace the Evidence the obvious demo path—not a greenfield UI.
+- `tests/architecture/test_stage10_serving.py`
+- `tests/architecture/test_stage10_stats.py`
+- `tests/architecture/test_replay_controls.py`
+- `tests/architecture/test_stage8_security.py`
 
 ---
 
-## Identified gaps
+## Identified gaps (this revision)
 
 | Goal | Gap |
 | --- | --- |
-| 1 Hero / brand | Tagline exists but is nav-scale; first viewport reads as scoreboard + controls + chart more than “See beyond the score.” |
-| 2 Match Story | Cards are newest-first; briefing summarises but does not clearly read as a chronological spine; Story is not clearly primary over stats/chart. |
-| 3 Timelines | Dual surfaces use generic “Match events” / “Analysis updates”; first-time judges can blur roles. |
-| 4 Trace the Evidence | Summary is “Evidence and verification”; verification journey is easy to miss beside dashboard chrome; loading / authority note can be clearer. |
-| 5 Replay states | Connection banner is mainly for reconnecting / unavailable; connecting, complete, and restart can be easy to miss beside the score. |
-| Differentiation | Surface can read as a generic football analytics dashboard; evidence-verification is not staged as the defining experience. |
+| Hierarchy | Need DOM order **Match Timeline → The Stat Ledger → What the Match Reveals**; Gate B had narrative before chart; interim work may still leave Ledger after narrative |
+| Narrative label | Prefer **What the Match Reveals**; no user-visible **Match Story** |
+| Stats placement | Ledger must sit immediately after the graph for quantitative context without implying proof |
+| Visual distinctiveness | Timeline as full-width main visual anchor; Ledger stacked below (never beside) |
+| Tracking temptation | Do not “upgrade” the graph into fake pitch tracking |
 
-No missing **server fields** are required for these gaps. Product choices (e.g. chronological
-display order vs keep newest-first + stronger briefing) must still use only cue order and
+No missing **server fields** are required. Product choices must still use only cue order and
 existing minute labels.
 
 ---
 
-## Ordered implementation plan (incremental)
+## Ordered implementation plan (this revision)
 
-Execute only after explicit UI implementation authorization (**Gate B** — not granted by this
-document). Each step should leave tests green and preserve SSE / run / CSP behaviour.
+Execute only under explicit authorization for this design revision (separate from Gate B
+commit `9c73d82`). Each step should leave tests green and preserve SSE / run / CSP behaviour.
 
-1. **Land this plan** in the repo (`docs/stage10-ui-plan.md`) — documentation-only (Gate A
-   when committed on request).
-2. **Product language in chrome** — Apply glossary labels (On-Pitch Record, Verified Analysis,
-   The Stat Ledger + context dek, Trace the Evidence, brand thesis); never “Intelligence
-   Changes.”
-3. **Match Story + Trace hierarchy** — Make Story the primary column/journey; Trace the
-   Evidence the defining disclosure; demote chart and Stat Ledger to supporting context
-   (layout/copy/focus order only).
-4. **Hero / brand hierarchy** — HTML/CSS so **MatchEyes — See beyond the score** + fixture
-   identity dominate the first viewport; no new fixture strings beyond `/matches` and
-   cue-driven score/minute.
-5. **Replay-state prominence** — Make `#replay-state` and `#connection` the obvious “what
-   the system is doing” region for all listed states; keep ADR-0017 semantics.
-6. **Timeline / chart copy pass** — Reinforce snapshot-close (On-Pitch) vs analysis
-   publication (Verified Analysis); lane headings and focus order only.
-7. **Regression pins** — Extend static architecture tests for new labels/structure; do not
-   weaken field allowlists, hold/run assertions, or proposed-below-verified authority.
-8. **Manual verification** — Local `serve`, then ACA (see below). Image rebuild / deploy
-   only under separate Gate C approval.
+1. **Amend this plan** — record glossary, thesis, and hierarchy (this document).
+2. **DOM hierarchy** — **chart → stats → main** (`What the Match Reveals`); `.match-centre`
+   stacks Timeline full-width above Ledger at every viewport.
+3. **Product language** — **What the Match Reveals**, **Match Timeline**, Stat Ledger dek;
+   reject “Match Story” / “Intelligence Changes” in HTML chrome.
+4. **Visual clarity** — timeline as anchor; event vs analysis distinction; Trace on cards.
+5. **Regression pins** — pin `chart < stats < main`, labels, skip target, Stat Ledger dek.
+6. **Manual verification** — local `serve` checklist below. Deploy only under separate Gate C.
 
-Do not combine deploy with UI commits by default.
+Do not amend Gate B; do not combine deploy with this UI revision by default.
 
 ---
 
@@ -236,57 +271,52 @@ Do not combine deploy with UI commits by default.
 
 A judge who never opens the repository can:
 
-1. See **MatchEyes — See beyond the score** and **which fixture** (competition, teams,
-   venue/matchday as already provided) in the first viewport, and state that the product is
-   about what the score cannot show.
-2. Follow **Match Story** as verified insights change in match time (published / updated
-   minutes from existing clock mapping).
-3. Distinguish **On-Pitch Record** from **Verified Analysis** in the aside (and understand
-   the chart’s dual lanes via disclaimer language).
-4. Open **Trace the Evidence** as the primary demo gesture and see server `rows` with
-   **verifier authority over proposed** content; proposed findings remain visually and
-   verbally distinct from verified findings; revised and retracted insights retain existing
-   meanings; a run change leaves stale work ignored or refreshed per existing guards.
-5. Treat **The Stat Ledger** as context only (helper copy), not as verified insight strength.
-6. Always know whether the replay is **connecting**, **replaying**, **paused**,
-   **reconnecting**, **reloading**, **complete**, **unavailable**, or **restarted** after a
-   new server `run`—including after a dropped connection.
+1. See **MatchEyes — See beyond the score** and **which fixture** in the first viewport.
+2. See the **Match Timeline** as the main visual of match developments (honest about data
+   limits).
+3. See **The Stat Ledger** immediately below the full-width graph as context only—not as
+   automatically verified insights or proof of findings below.
+4. Follow **What the Match Reveals** and open **Trace the Evidence** with verifier authority
+   over proposed content; revised/retracted meanings intact; run guards intact.
+5. Distinguish **On-Pitch Record** from **Verified Analysis**.
+6. Always know replay state (connecting, replaying, paused, reconnecting, reloading,
+   complete, unavailable, or restarted after a new `run`).
 
 Non-criteria (must remain false):
 
-- Page invents scores, events, metrics, evidence IDs, or confidence.
+- Page invents scores, events, metrics, evidence IDs, confidence, ball/player tracking, or
+  causal event–insight or statistic–insight links.
 - Page calls a live model or embeds Foundry credentials.
 - Cue kinds, stats schema, tones, or CSP change.
 - Labels imply proposed == verified, or that Stat Ledger figures are verified insights.
+- “Match Story” remains a preferred user-visible product label.
 - Claims of trademark clearance or global uniqueness for chrome names.
 
 ---
 
 ## Regression and accessibility tests
 
-### Automated (required before calling UI done)
+### Automated (required before calling this revision done)
 
 | Suite | Protects |
 | --- | --- |
-| `tests/architecture/test_replay_controls.py` | Single dispatch path; hold/resume; run reset; show-work run check; pause button a11y; no silent break of `unavailable` |
-| `tests/architecture/test_stage10_serving.py` | Stream event set including `stats`; stats field allowlist; display-only figures |
+| `tests/architecture/test_replay_controls.py` | Hold/resume; run reset; show-work run check; pause a11y |
+| `tests/architecture/test_stage10_serving.py` | Stream/stats allowlists; chrome labels; DOM hierarchy |
 | `tests/architecture/test_stage10_stats.py` | Stats contract pins |
-| `tests/architecture/test_stage8_security.py` | No `innerHTML` / unsafe sinks; presentation stays server-text |
+| `tests/architecture/test_stage8_security.py` | No `innerHTML` / unsafe sinks; CSP-compatible surface |
 
-Add or adjust **string/structure pins** when labels change (e.g. “Trace the Evidence”,
-“On-Pitch Record”, “Verified Analysis”, “The Stat Ledger”, hero/tagline). Prefer pins over
-behaviour changes. Pin that Stat Ledger helper copy still denies automatic insight
-verification.
+Pin **What the Match Reveals**, **Match Timeline**, absence of user-visible **Match Story**
+in HTML chrome, skip-link target, Stat Ledger context / not automatically verified insights,
+and DOM order **chart → stats → main** (Match Timeline → Stat Ledger → What the Match Reveals).
 
-### Accessibility expectations (manual + existing live regions)
+### Accessibility expectations
 
-- Keep skip link (target Match Story), landmarks (`aria-labelledby`), focus management on
-  story/timeline resets.
-- Keep `#announcer` (`role="status"`) and `#alerts` (`role="alert"`).
-- Visible focus (`:focus-visible`); do not remove `aria-describedby` on pause.
-- Theme switch and lane toggles remain operable by keyboard.
-- Do not rely on colour alone for verdict / retraction / reconnect / proposed vs verified
-  meaning (retain text labels already present).
+- Skip link targets primary content thoughtfully (Match Timeline and/or narrative heading);
+  landmarks and focus management on story/timeline resets remain.
+- Keep `#announcer` and `#alerts` live regions; visible `:focus-visible`; pause
+  `aria-describedby`.
+- Theme switch and lane toggles remain keyboard operable.
+- Do not rely on colour alone for verdict / retraction / reconnect / proposed vs verified.
 
 ---
 
@@ -294,37 +324,32 @@ verification.
 
 | Risk | Mitigation |
 | --- | --- |
-| Polish invents narrative or facts | Diff review: no new free text except fixed chrome labels and required deks; cue/about/work rows only |
-| Labels overclaim verification (“Verified Analysis”, “Ledger”, “Trace”) | Glossary “must not imply”; Stat Ledger dek; keep proposed below verified; retain revised/retracted copy |
-| Surface still reads as generic dashboard | Story + Trace hierarchy before scoreboard/stats polish; acceptance #4–5 |
-| Break pause / run / Trace fetch | Keep `test_replay_controls` green; no EventSource semantics change |
-| Temptation to load fonts/CDNs | CSP forbids it; keep system font stacks in `app.css` |
-| Chart + lanes still confuse | Copy and focus-order; On-Pitch vs Verified Analysis headings |
-| ACA cold start misread as “broken” | Honest connecting / reconnecting copy only; no fake progress percentages |
+| Polish invents narrative or facts | Diff review: chrome labels and deks only; cue/about/work rows only |
+| Fake tracking UI | Retain snapshot timeline; document honesty limit |
+| Labels overclaim verification | Glossary; Stat Ledger dek; proposed below verified |
+| Ledger read as proof of insights | Placement reason + dek; no invented statistic–insight links |
+| Narrative hard to reach under viz | Keep narrative immediately below Timeline+Ledger; Trace stays on cards |
+| Break pause / run / Trace fetch | Keep `test_replay_controls` green |
+| CDN / CSP temptation | Forbidden |
 | Scope creep into deploy | Hard gate below |
-| Assumed name uniqueness | Naming caveat at top; no legal/uniqueness claims in UI or docs |
+| Rewriting Gate B history | Separate commit only; no amend of `9c73d82` |
 
 ---
 
 ## Architectural constraints (explicit)
 
-1. **Presentation sits downstream of verified truth** (architecture dependency rules;
-   ADR-0012 / ADR-0014). The static page must not feed facts back into analytics or agents.
-2. **Cue contract frozen** for this workstream: `moment`, `insight`, `revision`,
-   `retraction`, `status` only; `stats` remains a separate SSE event (ADR-0016), not a cue
-   kind.
-3. **Run identity** (ADR-0017): edition messages carry `run`; Trace-the-Evidence responses
-   must match current `run`; a new run resets the page; do not splice replays via
-   `Last-Event-ID` from another run.
-4. **CSP unchanged**: no inline script/style hosts beyond `'self'`; `connect-src 'self'` only.
-5. **Authority order in Trace the Evidence**: verifier / verified tones above proposed
-   (`lifecycle/explain.py`); the page must not reorder tones to elevate proposals.
+1. **Presentation sits downstream of verified truth** (ADR-0012 / ADR-0014).
+2. **Cue contract frozen:** `moment`, `insight`, `revision`, `retraction`, `status`; `stats`
+   is a separate SSE event (ADR-0016).
+3. **Run identity** (ADR-0017): Trace responses must match current `run`; no cross-run
+   `Last-Event-ID` splice.
+4. **CSP unchanged**; `connect-src 'self'` only.
+5. **Authority order in Trace the Evidence:** verified above proposed; page must not reorder.
 6. **No live Foundry** on `serve` / ACA image (ADR-0015).
-7. **Timestamps**: only map existing `snapshot_id` → clock `minute`; do not invent clocks.
-8. **Labels are chrome only**: do not rename server fields, cue kinds, or tones; do not use
-   “Intelligence Changes.”
-9. **No overclaim**: proposed ≠ verified; revisions and retractions keep existing meanings;
-   Stat Ledger ≠ verified insight.
+7. **Timestamps:** only `snapshot_id` → clock `minute`; no invented clocks or tracking.
+8. **Labels are chrome only**; do not use “Intelligence Changes” or preferred “Match Story”.
+9. **No overclaim:** proposed ≠ verified; Stat Ledger ≠ verified insight.
+10. **Hierarchy change is product/presentation only** — not a truth-pipeline change.
 
 ---
 
@@ -338,32 +363,20 @@ uv run python -m matcheyes serve deploy/matches --recordings deploy/recordings -
 
 Open `http://127.0.0.1:8000/` and check:
 
-1. First viewport: **MatchEyes — See beyond the score** + fixture identity + score/minute/
-   replay state (score as context, not the whole product).
-2. Match Story: insight appears/updates with published minutes; empty state before any;
-   Story reads as primary vs chart/Stat Ledger.
-3. Aside: switch **On-Pitch Record** vs **Verified Analysis**; contents stay in role.
-4. Chart: readout and legend still describe snapshot (on-pitch) vs analysis publication.
-5. **Trace the Evidence**: open disclosure; rows load; proposed clearly secondary to
-   verified; revised/retracted cards still clear; close and reopen after a forced restart if
-   testing run change locally.
-6. **The Stat Ledger**: helper copy states context only / not automatic verified insights.
-7. Pause / resume: hold summary; resume applies held messages; overflow path if exercised.
-8. Disconnect (DevTools offline): reconnecting banner + live announcement; restore:
-   replaying or complete as appropriate.
-9. Keyboard: skip link, lane radios, chart event buttons, Trace summaries.
-10. Theme: dark / light / system without losing status or proposed/verified distinction.
+1. First viewport: brand + fixture + score/minute/replay state.
+2. **Match Timeline** is full-width; **The Stat Ledger** stacks directly below; then
+   **What the Match Reveals**.
+3. Narrative label is **What the Match Reveals** (no preferred “Match Story” chrome).
+4. Aside: On-Pitch Record vs Verified Analysis.
+5. Timeline copy: snapshot close vs analysis publication; no fake tracking claims.
+6. **Trace the Evidence**: load rows; proposed secondary; run/stale guards; stays on the card.
+7. **The Stat Ledger**: context only / not automatically verified insights; not proof of findings.
+8. Pause / resume; disconnect/reconnect; keyboard; theme.
 
 ### Azure Container Apps
 
-After a **separately approved** deploy of an image that includes the UI changes:
-
-1. Hit public URL; allow cold start (connecting may last tens of seconds).
-2. Repeat the local checklist on the hosted origin (same-origin SSE; no SWA split).
-3. Confirm `/health` is ready before judging demos when possible.
-4. Confirm About / provenance still describe fictional match + recorded reasoner as served.
-5. Do **not** expect mid-match resume across scale-to-zero; new process ⇒ new `run` ⇒
-   restart from kick-off (already announced by the page).
+After a **separately approved** deploy only. Same checklist on the hosted origin. Cold start
+and scale-to-zero behaviour unchanged (new process ⇒ new `run`).
 
 ---
 
@@ -371,25 +384,24 @@ After a **separately approved** deploy of an image that includes the UI changes:
 
 | Gate | What it covers | Who must approve |
 | --- | --- | --- |
-| **A — Documentation** | This file | Commit on request (amendments do not auto-commit) |
-| **B — UI implementation** | Static HTML/CSS/JS + test pins only | Explicit “implement Stage 10 UI” authorization — **not** granted by this amendment |
-| **C — Deploy** | Docker build, ACR push, ACA revision, `minReplicas` | Explicit deploy authorization (separate from B) |
+| **A — Documentation** | This file | Commit on request |
+| **B — UI implementation** | Static HTML/CSS/JS + test pins (Gate B landed as `9c73d82`) | Was authorized separately |
+| **B2 — Hierarchy / Reveals revision** | Plan amend + presentation/tests for this product decision | Explicit authorization for this revision |
+| **C — Deploy** | Docker build, ACR push, ACA revision, `minReplicas` | Explicit deploy authorization |
 
 Rules:
 
-- Completing gate B does **not** imply gate C.
-- Gate C must not change cue contracts, Foundry wiring, or CSP.
-- Prefer verifying gate B locally before any ACA rollout.
-- Cost/scale (`minReplicas` 0 vs 1) remains an operator choice under `deploy/azure/`; not part
-  of presentation acceptance.
-- This differentiation amendment does **not** authorize Gate B.
+- Completing B2 does **not** imply Gate C.
+- Do not amend Gate B; land B2 as a new commit when approved.
+- Prefer verifying B2 locally before any ACA rollout.
 
 ---
 
 ## Boundary reminder
 
 Stage 10 presentation polish **preserves** existing ADRs and contracts. It rearranges and
-labels what the server already sends—centering **Match Story** and **Trace the Evidence**
-under **See beyond the score**. It does not generate football reasoning, modify verified
-findings, change cue semantics, elevate proposed over verified, treat The Stat Ledger as
-verified insight, or treat the browser as an authority on truth.
+labels what the server already sends—centering **Match Timeline → The Stat Ledger → What
+the Match Reveals → Trace the Evidence** under **See beyond the score**. It does not generate
+football reasoning, modify verified findings, change cue semantics, elevate proposed over
+verified, invent tracking, treat The Stat Ledger as verified insight or proof, or treat the
+browser as an authority on truth.

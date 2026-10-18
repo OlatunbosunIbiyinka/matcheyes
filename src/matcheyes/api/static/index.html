@@ -41,7 +41,7 @@
       <path class="cr-chevron" d="M5.6 29.2L20 36.4L34.4 29.2V32.6L20 39.8L5.6 32.6Z"/>
     </symbol>
   </svg>
-  <a class="skip" href="#story-heading">Skip to the Match Story</a>
+  <a class="skip" href="#chart-heading">Skip to the Match Timeline</a>
 
   <header class="topbar">
     <p class="brand">
@@ -132,74 +132,16 @@
     <button id="retry" class="text-button" type="button" hidden>Try again</button>
   </div>
 
-  <main class="layout">
-    <section class="story" aria-labelledby="story-heading">
-      <div class="section-head">
-        <h2 id="story-heading" tabindex="-1">Match Story</h2>
-        <p class="section-dek">What the score cannot show: verified insight changes as the match
-          develops. Open <strong>Trace the Evidence</strong> on any finding to see how it was
-          checked. Newer cards appear first; each card keeps its published match minute.</p>
-      </div>
-      <section id="briefing" class="briefing" aria-labelledby="briefing-heading">
-        <h3 id="briefing-heading">Match briefing</h3>
-        <div class="brief-row">
-          <h4>On-Pitch Record</h4>
-          <div>
-            <p id="brief-moments-empty" class="quiet">Waiting for the replay to start.</p>
-            <ol id="brief-moments" class="brief-moments"></ol>
-          </div>
-        </div>
-        <div class="brief-row">
-          <h4>Showing now</h4>
-          <div>
-            <p id="brief-analysis-empty" class="quiet">No verified insight is showing.</p>
-            <ul id="brief-analysis" class="brief-analysis"></ul>
-          </div>
-        </div>
-      </section>
-      <p id="feed-status" class="feed-status"></p>
-      <div id="empty" class="empty">
-        <h3>No verified insight right now</h3>
-        <p>MatchEyes publishes an insight only when it detects a change in the match and the
-          verifier accepts how it is described. Goals, cards, substitutions and the half-time and
-          full-time whistles are in the On-Pitch Record.</p>
-      </div>
-      <div id="cards" class="story-items"></div>
-    </section>
-
-    <aside class="timeline" aria-labelledby="timeline-heading">
-      <div class="section-head">
-        <h2 id="timeline-heading">Match timeline</h2>
-      </div>
-      <fieldset class="segmented view-toggle">
-        <legend class="sr-only">Show</legend>
-        <div class="options">
-          <label><input type="radio" name="lane" value="moments" checked><span>On-Pitch Record</span></label>
-          <label><input type="radio" name="lane" value="log"><span>Verified Analysis</span></label>
-        </div>
-      </fieldset>
-      <div id="lane-moments">
-        <p id="moments-note" class="quiet lane-note" hidden>Latest first. Open an event for the score at that point and the
-          analysis that was showing. Placement uses snapshot close, not the exact event clock.</p>
-        <p id="moments-empty" class="quiet">No on-pitch events yet. They appear here from kick-off.</p>
-        <ol id="moments" class="events"></ol>
-      </div>
-      <div id="lane-log" hidden>
-        <p class="quiet lane-note">Insight updates from MatchEyes: published, revised or retracted.
-          Status on each item still applies; not every entry is currently verified.</p>
-        <p id="log-empty" class="quiet">No verified analysis updates yet.</p>
-        <ol id="log" class="analysis"></ol>
-      </div>
-    </aside>
-  </main>
-
-  <section id="chart" class="chart support" aria-labelledby="chart-heading">
+  <div class="match-centre">
+  <section id="chart" class="chart chart-primary" aria-labelledby="chart-heading">
     <div class="chart-head">
-      <h2 id="chart-heading" tabindex="-1">Pitch timeline</h2>
-      <p class="chart-note">Supporting view. On-Pitch Record marks sit on time rails at
+      <h2 id="chart-heading" tabindex="-1">Match Timeline</h2>
+      <p class="chart-note">What happened in match time. On-Pitch Record marks sit on time rails at
         <strong>snapshot close</strong> (the end of the match minute in which each event was
         recorded), not the exact moment it happened. The Verified Analysis lane shows when
-        insights were published, revised or retracted; it is not linked to on-pitch events.</p>
+        insights were published, revised or retracted; it is not a pitch tracking view and does
+        not invent ball or player positions. The Stat Ledger below gives quantitative context;
+        analytical findings follow under What the Match Reveals.</p>
     </div>
     <p id="chart-gap" class="chart-gap" hidden></p>
     <div id="chart-frame" class="chart-frame">
@@ -232,9 +174,9 @@
     </div>
     <p id="chart-help" class="sr-only">On-Pitch Record events are buttons in time order, home team on the
       time rail above the pitch and away team on the rail below. Use the arrow keys to move between
-      them, Home and End for the first and last, and Enter to open the event in the match timeline.
-      Selecting an event moves the timeline position to it. The score and Verified Analysis lanes are also
-      listed in the match timeline.</p>
+      them, Home and End for the first and last, and Enter to open the event in the record and
+      analysis lanes. Selecting an event moves the timeline position to it. The score and
+      Verified Analysis lanes are also listed beside What the Match Reveals.</p>
     <ul class="chart-legend" aria-hidden="true">
       <li><svg class="lg-ball" viewBox="0 0 24 24" focusable="false"><use href="#me-ball"/></svg>Timeline position</li>
       <li><span class="lg lg-goal"></span>Goal</li>
@@ -248,7 +190,7 @@
       <li><span class="lg lg-retracted"></span>Insight retracted</li>
     </ul>
     <div id="chart-readout" class="chart-readout">
-      <p class="quiet">Select an event on the chart to see its details.</p>
+      <p class="quiet">Select an event on the Match Timeline to see its details.</p>
     </div>
   </section>
 
@@ -257,7 +199,7 @@
       <h2 id="stats-heading" tabindex="-1">The Stat Ledger</h2>
       <p class="chart-note">Statistical context only: counts, shares and ratios from the match
         event data, recalculated at each snapshot. These figures are <strong>not</strong>
-        automatically verified insights and are not linked to Match Story findings.</p>
+        automatically verified insights and are not proof of What the Match Reveals findings.</p>
     </div>
     <div class="stats-anchor">
       <p id="stats-anchor">The Stat Ledger appears here from the first snapshot of the replay.</p>
@@ -280,6 +222,70 @@
       <tbody id="stats-rows" class="stats-rows" role="rowgroup"></tbody>
     </table>
   </section>
+  </div>
+
+  <main class="layout">
+    <section class="story" aria-labelledby="story-heading">
+      <div class="section-head">
+        <h2 id="story-heading" tabindex="-1">What the Match Reveals</h2>
+        <p class="section-dek">What the available evidence shows as the match develops, and why
+          each finding has its verification status. Open <strong>Trace the Evidence</strong> on
+          any finding to inspect the server’s work. Newer cards appear first; each card
+          keeps its published match minute. The Match Timeline and Stat Ledger above share the
+          same snapshot minutes—this page does not invent causal links.</p>
+      </div>
+      <section id="briefing" class="briefing" aria-labelledby="briefing-heading">
+        <h3 id="briefing-heading">Match briefing</h3>
+        <div class="brief-row">
+          <h4>On-Pitch Record</h4>
+          <div>
+            <p id="brief-moments-empty" class="quiet">Waiting for the replay to start.</p>
+            <ol id="brief-moments" class="brief-moments"></ol>
+          </div>
+        </div>
+        <div class="brief-row">
+          <h4>Showing now</h4>
+          <div>
+            <p id="brief-analysis-empty" class="quiet">No verified insight is showing.</p>
+            <ul id="brief-analysis" class="brief-analysis"></ul>
+          </div>
+        </div>
+      </section>
+      <p id="feed-status" class="feed-status"></p>
+      <div id="empty" class="empty">
+        <h3>No verified insight right now</h3>
+        <p>MatchEyes publishes an insight only when it detects a change in the match and the
+          verifier accepts how it is described. Goals, cards, substitutions and the half-time and
+          full-time whistles are in the On-Pitch Record on the Match Timeline.</p>
+      </div>
+      <div id="cards" class="story-items"></div>
+    </section>
+
+    <aside class="timeline" aria-labelledby="timeline-heading">
+      <div class="section-head">
+        <h2 id="timeline-heading">Record and analysis</h2>
+      </div>
+      <fieldset class="segmented view-toggle">
+        <legend class="sr-only">Show</legend>
+        <div class="options">
+          <label><input type="radio" name="lane" value="moments" checked><span>On-Pitch Record</span></label>
+          <label><input type="radio" name="lane" value="log"><span>Verified Analysis</span></label>
+        </div>
+      </fieldset>
+      <div id="lane-moments">
+        <p id="moments-note" class="quiet lane-note" hidden>Latest first. Open an event for the score at that point and the
+          analysis that was showing. Placement uses snapshot close, not the exact event clock.</p>
+        <p id="moments-empty" class="quiet">No on-pitch events yet. They appear here from kick-off.</p>
+        <ol id="moments" class="events"></ol>
+      </div>
+      <div id="lane-log" hidden>
+        <p class="quiet lane-note">Insight updates from MatchEyes: published, revised or retracted.
+          Status on each item still applies; not every entry is currently verified.</p>
+        <p id="log-empty" class="quiet">No verified analysis updates yet.</p>
+        <ol id="log" class="analysis"></ol>
+      </div>
+    </aside>
+  </main>
 
   <section id="about" class="about" aria-labelledby="about-heading">
     <details id="about-details">
@@ -290,10 +296,10 @@
 
   <footer class="footer">
     <p>MatchEyes — See beyond the score. A demonstration on fictional football data. The
-      On-Pitch Record holds factual match events; Match Story insights are verified views,
-      shown with their status. Trace the Evidence to inspect the work. The Stat Ledger is
-      context only. All match and insight text comes from the server; this page computes
-      nothing about the match.</p>
+      Match Timeline shows On-Pitch Record events; The Stat Ledger is quantitative context
+      only; What the Match Reveals holds verified views with their status. Trace the Evidence
+      to inspect the work. All match and insight text comes from the server; this page
+      computes nothing about the match.</p>
     <p>Not affiliated with, or endorsed by, any league, club or broadcaster.</p>
   </footer>
 

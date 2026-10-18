@@ -272,17 +272,27 @@ select { max-width: 100%; min-height: var(--target); padding: 0 var(--s3); borde
 .hold-status { flex-basis: 100%; max-width: var(--measure); padding-left: var(--s3);
   border-left: 3px solid var(--amber); color: var(--ink); font-size: 0.875rem; font-weight: 600; }
 
-/* --- story primary; chart / Stat Ledger are supporting --- */
+/* --- Match Timeline → Stat Ledger → What the Match Reveals --- */
+.match-centre { display: flex; flex-direction: column; gap: var(--s5);
+  margin: var(--s5) var(--gutter) 0; }
 .chart, .story, .timeline, .about, .stats { border: 1px solid var(--rule); border-radius: var(--radius-lg);
   background: var(--surface); box-shadow: var(--shadow); }
+.chart-primary { margin: 0; padding: var(--s5) var(--s5) var(--s4);
+  border-color: var(--rule-strong); min-width: 0; }
+.chart-primary .chart-head h2 { font-size: clamp(1.35rem, 2.4vw, 1.7rem); line-height: 1.15; }
 .story { border-color: var(--rule-strong); }
-.support { margin: var(--s5) var(--gutter) 0; padding: var(--s5) var(--s5) var(--s4);
-  border-style: dashed; box-shadow: none; opacity: 0.98; }
+.support { margin: 0; padding: var(--s5) var(--s5) var(--s4);
+  border-style: dashed; box-shadow: none; opacity: 0.98; min-width: 0; }
 .support .chart-head h2::before { background: var(--stone); }
-.chart { margin: var(--s5) var(--gutter) 0; padding: var(--s5) var(--s5) var(--s4); }
-.stats.support { margin-bottom: var(--s5); }
+.chart { margin: 0; padding: var(--s5) var(--s5) var(--s4); }
+.match-centre .stats.support { margin: 0; }
+/* Stack only: full-width Match Timeline above The Stat Ledger at every breakpoint. */
 .chart-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between;
   gap: var(--s1) var(--s5); padding-bottom: var(--s2); border-bottom: 1px solid var(--rule); }
+/* Match Timeline: title full width, write-up stacked under it (not beside) at every viewport. */
+.chart-primary .chart-head { flex-direction: column; flex-wrap: nowrap; align-items: stretch;
+  justify-content: flex-start; gap: var(--s2); }
+.chart-primary .chart-note { max-width: none; margin: 0; }
 .chart-head h2, .section-head h2, .about summary h2 { display: flex; align-items: center; gap: var(--s2);
   margin: 0; font-family: var(--font-score); font-size: 1.2rem; font-weight: 700; letter-spacing: 0.02em; }
 .chart-head h2::before, .section-head h2::before, .about summary h2::before { content: ""; flex: none;
@@ -447,7 +457,7 @@ select { max-width: 100%; min-height: var(--target); padding: 0 var(--s3); borde
 .disclosure.work .work-note { margin: 0 0 var(--s2); max-width: var(--measure); }
 .quiet { color: var(--ink-2); font-size: 0.9375rem; }
 
-/* --- Match Story --- */
+/* --- What the Match Reveals --- */
 .feed-status { margin-bottom: var(--s4); padding-left: var(--s3); border-left: 3px solid var(--rule);
   color: var(--ink-2); font-size: 0.875rem; }
 .feed-status:empty { display: none; }
