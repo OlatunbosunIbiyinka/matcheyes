@@ -40,6 +40,13 @@
       <path class="cr-band" d="M4.2 7.9L20 3.7L35.8 7.9V12.6H4.2Z"/>
       <path class="cr-chevron" d="M5.6 29.2L20 36.4L34.4 29.2V32.6L20 39.8L5.6 32.6Z"/>
     </symbol>
+    <symbol id="me-pause" viewBox="0 0 24 24">
+      <rect x="6" y="5" width="4" height="14" rx="1"/>
+      <rect x="14" y="5" width="4" height="14" rx="1"/>
+    </symbol>
+    <symbol id="me-play" viewBox="0 0 24 24">
+      <path d="M8 5.5v13l11-6.5z"/>
+    </symbol>
   </svg>
   <a class="skip" href="#chart-heading">Skip to the Match Timeline</a>
 
@@ -122,7 +129,10 @@
     <div class="field">
       <span class="field-label" aria-hidden="true">Updates</span>
       <button id="hold" class="text-button hold-button" type="button" aria-describedby="hold-status"
-        aria-disabled="true">Pause updates</button>
+        aria-disabled="true">
+        <svg class="hold-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#me-pause"/></svg>
+        <span class="hold-label">Pause updates</span>
+      </button>
     </div>
     <p id="hold-status" class="hold-status" hidden></p>
   </form>

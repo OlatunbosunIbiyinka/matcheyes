@@ -267,6 +267,13 @@ select { max-width: 100%; min-height: var(--target); padding: 0 var(--s3); borde
   border-radius: var(--radius); background: var(--field); color: var(--ink); font: inherit; font-weight: 600;
   cursor: pointer; }
 .text-button:hover { background: var(--paper-deep); }
+.hold-button { display: inline-flex; align-items: center; gap: 0.45rem; min-width: 9.5rem;
+  justify-content: center; }
+.hold-icon { flex: none; width: 1.125rem; height: 1.125rem; fill: currentColor; }
+.hold-button:not([aria-disabled="true"]) { border-color: var(--pitch-text); color: var(--pitch-text); }
+.hold-button:not([aria-disabled="true"]):hover { background: var(--wash-pitch); }
+.hold-button.is-held:not([aria-disabled="true"]) { border-color: var(--amber); color: var(--amber); }
+.hold-button.is-held:not([aria-disabled="true"]):hover { background: var(--wash-amber); }
 .hold-button[aria-disabled="true"] { border-color: var(--rule); color: var(--ink-2); cursor: default; }
 .hold-button[aria-disabled="true"]:hover { background: var(--field); }
 .hold-status { flex-basis: 100%; max-width: var(--measure); padding-left: var(--s3);

@@ -160,7 +160,11 @@ function renderReplay() {
   $("connection-text").textContent = detail || REPLAY_TEXT[shown];
   $("retry").hidden = replay !== "unavailable";
   const button = $("hold");
-  button.textContent = held ? "Resume updates" : "Pause updates";
+  const label = button.querySelector(".hold-label");
+  const icon = button.querySelector(".hold-icon use");
+  if (label) label.textContent = held ? "Resume updates" : "Pause updates";
+  if (icon) icon.setAttribute("href", held ? "#me-play" : "#me-pause");
+  button.classList.toggle("is-held", Boolean(held));
   button.setAttribute("aria-disabled", held || canPause() ? "false" : "true");
   $("hold-status").textContent = held ? holdText(held) : "";
   $("hold-status").hidden = !held;

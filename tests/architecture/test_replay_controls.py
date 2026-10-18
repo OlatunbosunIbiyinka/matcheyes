@@ -130,7 +130,9 @@ def test_the_hold_limits_are_fixed_constants() -> None:
 
 def test_the_pause_control_is_a_described_button_without_a_toggle_state() -> None:
     button = re.search(r"<button id=\"hold\"[^>]*>(.*?)</button>", HTML, re.S)
-    assert button and button.group(1).strip() == "Pause updates"
+    assert button and "Pause updates" in button.group(1)
+    assert 'class="hold-label"' in button.group(1)
+    assert 'href="#me-pause"' in button.group(1)
     markup = button.group(0)
     assert 'type="button"' in markup and 'aria-describedby="hold-status"' in markup
     assert 'aria-disabled="true"' in markup and "aria-pressed" not in markup
@@ -138,6 +140,7 @@ def test_the_pause_control_is_a_described_button_without_a_toggle_state() -> Non
     status = re.search(r"<p id=\"hold-status\"[^>]*>", HTML)
     assert status and "aria-live" not in status.group(0) and "role=" not in status.group(0)
     assert '"Resume updates" : "Pause updates"' in JS
+    assert 'href", held ? "#me-play" : "#me-pause"' in JS or "#me-play" in JS
 
 
 def test_hold_wording_names_no_internals_or_causes() -> None:
