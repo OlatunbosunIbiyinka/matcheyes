@@ -280,7 +280,7 @@ select { max-width: 100%; min-height: var(--target); padding: 0 var(--s3); borde
 .chart-primary { margin: 0; padding: var(--s5) var(--s5) var(--s4);
   border-color: var(--rule-strong); min-width: 0;
   background:
-    linear-gradient(180deg, rgb(8 20 14 / 0.35) 0%, transparent 42%),
+    linear-gradient(180deg, color-mix(in srgb, var(--pitch) 14%, transparent) 0%, transparent 48%),
     var(--surface); }
 .chart-primary .chart-head h2 { font-size: clamp(1.35rem, 2.4vw, 1.7rem); line-height: 1.15; }
 .chart-primary .chart-frame { margin-top: var(--s4); padding: var(--s3) var(--s2) var(--s2);
