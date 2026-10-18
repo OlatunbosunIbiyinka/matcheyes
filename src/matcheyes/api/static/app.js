@@ -78,6 +78,8 @@ let minute = "";
 let period = 0;
 let phase = "";
 let uid = 0;
+let chartStaged = false; // first clock has woken the Match Timeline stage
+let firstInsightFocus = false; // one editorial focus pulse for the first live insight
 
 function el(tag, cls, text) {
   const node = document.createElement(tag);
@@ -143,10 +145,10 @@ function renderReplay() {
   node.textContent = REPLAY_TEXT[shown];
   const banner = $("connection");
   const detail = replayDetail || (
-    shown === "connecting" ? "Connecting to the replay." :
+    shown === "connecting" ? "Bringing up the match replay." :
     shown === "replaying" ? "" :
     shown === "paused" ? (held ? holdText(held) : "Updates are paused.") :
-    shown === "complete" ? "Replay complete." :
+    shown === "complete" ? "Replay complete — review the Match Timeline and findings." :
     shown === "reloading" ? "Reloading the replay." :
     shown === "reconnecting" ? "Connection lost. Reconnecting to the replay." :
     shown === "unavailable" ? "The replay is unavailable." :
@@ -1093,10 +1095,19 @@ function chartReset() {
   rove = null;
   picked = null;
   gapSeen = false;
+  chartStaged = false;
+  firstInsightFocus = false;
+  $("chart").classList.remove("is-live");
   for (const id of ["chart-events", "chart-notes", "chart-score"]) $(id).replaceChildren();
   $("chart-gap").hidden = true;
   $("chart-readout").replaceChildren(el("p", "quiet", READOUT_EMPTY));
   layoutChart();
+}
+
+function stageChart() {
+  if (chartStaged) return;
+  chartStaged = true;
+  $("chart").classList.add("is-live");
 }
 
 // --- team statistics: one server-formatted message per snapshot; values only size the bars ----
@@ -1360,6 +1371,10 @@ function onCue(cue) {
     chartNote(cue, "Insight published, " + at + ": " + item.head.textContent);
     if (live) {
       arrive(item.node);
+      if (!firstInsightFocus) {
+        firstInsightFocus = true;
+        item.node.classList.add("insight-focus");
+      }
       announce("New insight, " + at + ": " + item.head.textContent);
     }
   } else if (cue.kind === "revision") {
@@ -1436,6 +1451,7 @@ function onClock(tick) {
     return false;
   });
   refreshEmpty();
+  stageChart();
   chartClock(tick);
   statsClock(tick);
 }
@@ -1823,7 +1839,10 @@ async function init() {
   selectMatch();
   select.addEventListener("change", () => { selectMatch(); connect(); });
   for (const radio of document.querySelectorAll("input[name=audience]")) {
-    radio.addEventListener("change", connect);
+    radio.addEventListener("change", () => {
+      announce((audience() === "broadcaster" ? "Broadcaster" : "Fan") + " view.");
+      connect();
+    });
   }
   for (const radio of document.querySelectorAll("input[name=lane]")) {
     radio.addEventListener("change", showLane);
