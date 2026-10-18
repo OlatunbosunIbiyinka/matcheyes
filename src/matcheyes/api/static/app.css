@@ -293,6 +293,15 @@ select { max-width: 100%; min-height: var(--target); padding: 0 var(--s3); borde
 .chart-primary .chart-head { flex-direction: column; flex-wrap: nowrap; align-items: stretch;
   justify-content: flex-start; gap: var(--s2); }
 .chart-primary .chart-note { max-width: none; margin: 0; }
+.chart-lede { color: var(--ink); font-size: 0.9375rem; font-weight: 600; }
+.chart-reading { margin-top: var(--s3); max-width: var(--measure); }
+.chart-reading > summary { display: inline-flex; align-items: center; min-height: var(--target);
+  color: var(--ink-2); font-size: 0.8125rem; font-weight: 600; cursor: pointer;
+  list-style: none; text-decoration: underline; text-decoration-color: var(--rule-strong);
+  text-underline-offset: 0.2em; }
+.chart-reading > summary::-webkit-details-marker { display: none; }
+.chart-reading[open] > summary { margin-bottom: var(--s2); color: var(--ink); }
+.stats-dek { margin-top: var(--s2); }
 .chart-head h2, .section-head h2, .about summary h2 { display: flex; align-items: center; gap: var(--s2);
   margin: 0; font-family: var(--font-score); font-size: 1.2rem; font-weight: 700; letter-spacing: 0.02em; }
 .chart-head h2::before, .section-head h2::before, .about summary h2::before { content: ""; flex: none;

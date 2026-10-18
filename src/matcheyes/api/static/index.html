@@ -136,12 +136,8 @@
   <section id="chart" class="chart chart-primary" aria-labelledby="chart-heading">
     <div class="chart-head">
       <h2 id="chart-heading" tabindex="-1">Match Timeline</h2>
-      <p class="chart-note">What happened in match time. On-Pitch Record marks sit on time rails at
-        <strong>snapshot close</strong> (the end of the match minute in which each event was
-        recorded), not the exact moment it happened. The Verified Analysis lane shows when
-        insights were published, revised or retracted; it is not a pitch tracking view and does
-        not invent ball or player positions. The Stat Ledger below gives quantitative context;
-        analytical findings follow under What the Match Reveals.</p>
+      <p class="chart-note chart-lede">What happened in match time — On-Pitch Record and Verified
+        Analysis on one clock.</p>
     </div>
     <p id="chart-gap" class="chart-gap" hidden></p>
     <div id="chart-frame" class="chart-frame">
@@ -172,6 +168,15 @@
     <div class="pitch-caption">
       <p id="chart-position" class="chart-position">The timeline position appears when the replay starts.</p>
     </div>
+    <details class="chart-reading">
+      <summary>How to read the timeline</summary>
+      <p class="chart-note">On-Pitch Record marks sit on time rails at <strong>snapshot close</strong>
+        (the end of the match minute in which each event was recorded), not the exact moment it
+        happened. The Verified Analysis lane shows when insights were published, revised or
+        retracted. This is not a pitch tracking view and does not invent ball or player positions.
+        The Stat Ledger below is quantitative context only; analytical findings follow under
+        What the Match Reveals.</p>
+    </details>
     <p id="chart-help" class="sr-only">On-Pitch Record events are buttons in time order, home team on the
       time rail above the pitch and away team on the rail below. Use the arrow keys to move between
       them, Home and End for the first and last, and Enter to open the event in the record and
@@ -197,10 +202,11 @@
   <section id="stats" class="stats support" aria-labelledby="stats-heading">
     <div class="chart-head">
       <h2 id="stats-heading" tabindex="-1">The Stat Ledger</h2>
-      <p class="chart-note">Statistical context only: counts, shares and ratios from the match
-        event data, recalculated at each snapshot. These figures are <strong>not</strong>
-        automatically verified insights and are not proof of What the Match Reveals findings.</p>
+      <p class="chart-note chart-lede">Snapshot counts and shares — context only, <strong>not</strong>
+        automatically verified insights.</p>
     </div>
+    <p class="chart-note stats-dek">Recalculated at each snapshot from match event data. These figures
+      are not proof of What the Match Reveals findings.</p>
     <div class="stats-anchor">
       <p id="stats-anchor">The Stat Ledger appears here from the first snapshot of the replay.</p>
       <button id="stats-latest" class="link-button" type="button" hidden>Show the latest ledger</button>
@@ -228,11 +234,9 @@
     <section class="story" aria-labelledby="story-heading">
       <div class="section-head">
         <h2 id="story-heading" tabindex="-1">What the Match Reveals</h2>
-        <p class="section-dek">What the available evidence shows as the match develops, and why
-          each finding has its verification status. Open <strong>Trace the Evidence</strong> on
-          any finding to inspect the server’s work. Newer cards appear first; each card
-          keeps its published match minute. The Match Timeline and Stat Ledger above share the
-          same snapshot minutes—this page does not invent causal links.</p>
+        <p class="section-dek">Evidence-backed findings as the match develops. Open
+          <strong>Trace the Evidence</strong> on a card to inspect the server’s work. Newer cards
+          first; each keeps its published minute.</p>
       </div>
       <section id="briefing" class="briefing" aria-labelledby="briefing-heading">
         <h3 id="briefing-heading">Match briefing</h3>
