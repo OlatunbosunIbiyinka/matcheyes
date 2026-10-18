@@ -1,9 +1,9 @@
 # Stage 10 UI plan: replay presentation polish
 
-Status: **active product plan** (Gate A landed; Gate B chrome landed on `main` at
-`9c73d82`; this revision records **Match Timeline → The Stat Ledger → What the Match Reveals**
-before a separate commit). Source of truth: Stage 10 UI audit, differentiation review, Gate B,
-plus the **What the Match Reveals** / ledger-after-graph product decisions. This document does
+Status: **complete for Gate A–C** (UI on `main`; warm ACA deploy authorized and verified).
+Next stage is Stage 11 (final submission). Hierarchy shipped:
+**Match Timeline → The Stat Ledger → What the Match Reveals**. Source of truth for Stage 10
+product decisions (UI audit, differentiation review, Gate B chrome). This document does
 **not** change ADRs, cue contracts, API schemas, or acceptance thresholds.
 
 Related decisions (unchanged):

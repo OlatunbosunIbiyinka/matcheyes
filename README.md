@@ -40,13 +40,15 @@ See [`docs/architecture.md`](docs/architecture.md).
 
 ## Status
 
-Built in explicit, reviewed stages. **Current: Stage 9 (in review) — a real Microsoft Foundry
-model behind the existing reasoning boundary: an untrusted proposal generator whose output passes
-the same verifier and audits, evaluated on held-out data, recorded once and replayed on the web
-surface with a read-only "show the work" view.** The public surface never calls the model: it
+Built in explicit, reviewed stages. **Current: Stage 10 (done) — product UX for the hackathon
+demo.** The replay page is an editorial match surface: Match Timeline, The Stat Ledger, What the
+Match Reveals, Trace the Evidence, and accessible replay states — presentation only; the truth
+pipeline is unchanged. Stage 9 is **done**: a Foundry model as Challenger (B′), recorded once and
+replayed on the web; details and measured findings stay in
+[stage9-evaluation.md](docs/stage9-evaluation.md). The public surface never calls the model: it
 replays a pinned recording, and a missing entry shows as unavailable. This is a deterministic
 replay of synthetic, fictional matches (local `serve` or ACA, one replica max) — not production
-real-time model inference or multi-region broadcasting.
+real-time model inference or multi-region broadcasting. Next: Stage 11 (final submission).
 
 | Stage | Scope | Status |
 | --- | --- | --- |
@@ -60,8 +62,8 @@ real-time model inference or multi-region broadcasting.
 | 6 | Personalization (Fan / Broadcaster / Analyst): audience views and feeds over verified insights, preferences for relevance only, independent view audit, presentation red team (no user study yet) | Done |
 | 7 | Snapshot-anchored insight lifecycle: event log with contiguous watermark, one canonical snapshot per closed minute, storylines with append-only revisions, lifecycle audit, replay evaluation (no corrections, no streaming infrastructure) | Done |
 | 8 | Broadcast cue contract and live match surface: moment / insight / revision / retraction / status cues, deterministic selection, one server-owned replay per match, read-only stdlib HTTP + SSE, CSP static page (no Foundry, no Azure) | Done |
-| 9 | Foundry model behind the reasoning boundary: strict wire schemas, Entra auth, held-out evaluation of the real model (model as Investigator rejected on measured evidence; model as Challenger adopted), recorded runs replayed publicly, read-only show-your-work, credential-free container image on Azure Container Apps (`deploy/azure/`; open findings in [stage9-evaluation.md](docs/stage9-evaluation.md)) | In review |
-| 10 | Product UX and hackathon polish: redesigned replay page (editorial match hero, Match Timeline, What the Match Reveals, separate On-Pitch Record and Verified Analysis, Trace the Evidence, Stat Ledger, accessible replay states; presentation only) | In progress |
+| 9 | Foundry model behind the reasoning boundary: strict wire schemas, Entra auth, held-out evaluation of the real model (model as Investigator rejected on measured evidence; model as Challenger adopted), recorded runs replayed publicly, read-only show-your-work, credential-free container image on Azure Container Apps (`deploy/azure/`; measured findings in [stage9-evaluation.md](docs/stage9-evaluation.md)) | Done |
+| 10 | Product UX and hackathon polish: redesigned replay page (editorial match hero, Match Timeline, What the Match Reveals, separate On-Pitch Record and Verified Analysis, Trace the Evidence, Stat Ledger, accessible replay states; presentation only) | Done |
 | 11 | Final submission | Not started |
 
 ## Quick start
@@ -169,6 +171,7 @@ Foundry credentials on the public path ([ADR-0017](docs/decisions/0017-replay-li
 - [Living insights](docs/living-insights.md) and [Stage 7 evaluation](docs/stage7-evaluation.md)
 - [Broadcast cues and the live surface: Stage 8 evaluation](docs/stage8-evaluation.md)
 - [A Foundry model as an untrusted reasoner: Stage 9 evaluation](docs/stage9-evaluation.md)
+- [Stage 10 UI plan (product UX)](docs/stage10-ui-plan.md)
 - [Azure Container Apps deploy](deploy/azure/README.md)
 - [Development workflow](docs/development.md)
 - [Architecture decision records](docs/decisions/README.md)
