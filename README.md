@@ -5,8 +5,9 @@
 MatchEyes is an explainable football intelligence engine built for Microsoft's
 *Inside the Game: Developer Hackathon* — challenge: **The Synthetic Match Insights Engine for
 Premier League Studio**. A Microsoft Foundry model (`gpt-5-mini`) has been evaluated behind the
-reasoning boundary, and the web surface replays a *recorded* run of it; the application runs
-locally (a container image exists; it is not deployed to Azure).
+reasoning boundary, and the web surface replays a *recorded* run of it. The same credential-free
+replay image runs locally and on **Azure Container Apps** (static UI + SSE, same origin; the
+public path never calls Foundry).
 
 It turns synthetic, football-realistic match events into explainable insights, key moments and
 audience-personalized views that update minute by minute as a match is replayed (deterministic,
@@ -44,8 +45,8 @@ model behind the existing reasoning boundary: an untrusted proposal generator wh
 the same verifier and audits, evaluated on held-out data, recorded once and replayed on the web
 surface with a read-only "show the work" view.** The public surface never calls the model: it
 replays a pinned recording, and a missing entry shows as unavailable. This is a deterministic
-replay of synthetic, fictional matches on one local process — not production real-time model
-inference or broadcasting, and not cloud-hosted.
+replay of synthetic, fictional matches (local `serve` or ACA, one replica max) — not production
+real-time model inference or multi-region broadcasting.
 
 | Stage | Scope | Status |
 | --- | --- | --- |
@@ -59,7 +60,7 @@ inference or broadcasting, and not cloud-hosted.
 | 6 | Personalization (Fan / Broadcaster / Analyst): audience views and feeds over verified insights, preferences for relevance only, independent view audit, presentation red team (no user study yet) | Done |
 | 7 | Snapshot-anchored insight lifecycle: event log with contiguous watermark, one canonical snapshot per closed minute, storylines with append-only revisions, lifecycle audit, replay evaluation (no corrections, no streaming infrastructure) | Done |
 | 8 | Broadcast cue contract and live match surface: moment / insight / revision / retraction / status cues, deterministic selection, one server-owned replay per match, read-only stdlib HTTP + SSE, CSP static page (no Foundry, no Azure) | Done |
-| 9 | Foundry model behind the reasoning boundary: strict wire schemas, Entra auth, held-out evaluation of the real model (model as Investigator rejected on measured evidence; model as Challenger adopted), recorded runs replayed publicly, read-only show-your-work, container image (Azure deployment not performed; open findings in [stage9-evaluation.md](docs/stage9-evaluation.md)) | In review |
+| 9 | Foundry model behind the reasoning boundary: strict wire schemas, Entra auth, held-out evaluation of the real model (model as Investigator rejected on measured evidence; model as Challenger adopted), recorded runs replayed publicly, read-only show-your-work, credential-free container image on Azure Container Apps (`deploy/azure/`; open findings in [stage9-evaluation.md](docs/stage9-evaluation.md)) | In review |
 | 10 | Product UX and hackathon polish: redesigned replay page (editorial match hero, Match Story, separate match-event and analysis timelines, contextual evidence disclosures, accessible replay states; presentation only) | In progress |
 | 11 | Final submission | Not started |
 
@@ -96,6 +97,9 @@ uv run python -m matcheyes serve demo/observable --speed 20
 uv run python -m matcheyes serve deploy/matches --recordings deploy/recordings --speed 20
 # Record a match once against a configured model (MATCHEYES_LLM_*; see .env.example)
 uv run --extra azure python -m matcheyes record deploy/matches/<match_id> --out deploy/recordings --roles challenger
+
+# Public demo host (ACA, maxReplicas=1; minReplicas 0 idle / 1 warm): see deploy/azure/README.md
+# .\deploy\azure\deploy.ps1 -ResourceGroup matcheyes-demo-rg -Location swedencentral
 
 # Synthetic matches (hidden-world tooling; never shipped with the engine)
 uv run python -m matcheyes_synth generate --scenario S02_press_surge   # default seed
@@ -135,13 +139,17 @@ src/matcheyes_synth/  HIDDEN    fictional league, hidden state, scenarios, gener
 src/matcheyes_eval/   HIDDEN    scores engine output against the answer key (never shipped)
 tests/             unit, architecture-boundary, security and evaluation tests
 data/              synthetic data and test fixtures
+deploy/            demo matches, pinned recordings, Dockerfile inputs
+deploy/azure/      ACA + ACR Bicep and deploy.ps1 (hackathon public demo)
 docs/              architecture, agent design, data model, evaluation, ADRs
 scripts/           local quality gate
 ```
 
 The web surface is three static files in `src/matcheyes/api/static/`. `Dockerfile` and `deploy/`
 (an observable match, its pinned recording, hash-pinned requirements) build a credential-free
-image of the replay server; it has not been deployed.
+image of the replay server. That image is what runs on Azure Container Apps
+([`deploy/azure/`](deploy/azure/README.md)): one replica max, same-origin static UI + SSE, no
+Foundry credentials on the public path ([ADR-0017](docs/decisions/0017-replay-lifecycle-identity-and-serving-bounds.md)).
 
 ## Documentation
 
@@ -161,5 +169,6 @@ image of the replay server; it has not been deployed.
 - [Living insights](docs/living-insights.md) and [Stage 7 evaluation](docs/stage7-evaluation.md)
 - [Broadcast cues and the live surface: Stage 8 evaluation](docs/stage8-evaluation.md)
 - [A Foundry model as an untrusted reasoner: Stage 9 evaluation](docs/stage9-evaluation.md)
+- [Azure Container Apps deploy](deploy/azure/README.md)
 - [Development workflow](docs/development.md)
 - [Architecture decision records](docs/decisions/README.md)

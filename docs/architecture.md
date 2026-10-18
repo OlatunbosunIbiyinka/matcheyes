@@ -4,7 +4,8 @@ Status: **deterministic engine (Stages 0–3), agentic investigation (Stage 4), 
 (Stage 5), deterministic personalization (Stage 6), a snapshot-anchored insight lifecycle
 (Stage 7), a broadcast cue contract with a live, read-only presentation surface (Stage 8), and a
 Microsoft Foundry model behind the reasoning boundary, replayed from recordings on the public
-surface (Stage 9, in review)**. The application is not deployed to Azure.
+surface (Stage 9, in review)**. The credential-free replay image is hosted on Azure Container
+Apps for the hackathon demo ([`deploy/azure/`](../deploy/azure/README.md)).
 
 ## Principle
 
@@ -228,8 +229,8 @@ Stage 9 uses one Microsoft Foundry (AIServices) resource with a `gpt-5-mini` dep
 reached with Microsoft Entra ID, for recording and evaluation only. Microsoft Agent Framework
 and Foundry Agent Service are not used: the fixed-sequence topology stays explicit
 ([ADR-0010](decisions/0010-agentic-investigation.md), [ADR-0015](decisions/0015-foundry-model-as-untrusted-reasoner.md)).
-A credential-free container image of the replay server exists (`Dockerfile`, `deploy/`); the
-planned host is Azure Container Apps with **one replica max** (in-memory replay / run identity),
-optional scale-to-zero, and SSE-aware ingress idle timeout — see [`deploy/azure/`](../deploy/azure/README.md).
-Static UI and SSE stay on the same origin (no Static Web Apps split). Data store and eventing
-remain open.
+A credential-free container image of the replay server (`Dockerfile`, `deploy/`) is deployed to
+Azure Container Apps with **one replica max** (in-memory replay / run identity),
+`minReplicas` 0 (idle) or 1 (warm judging), and SSE-aware ingress — see
+[`deploy/azure/`](../deploy/azure/README.md). Static UI and SSE stay on the same origin (no
+Static Web Apps split). Foundry stays recording/eval only. Data store and eventing remain open.
