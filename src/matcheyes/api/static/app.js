@@ -130,16 +130,32 @@ function setReplay(next, detail) {
   renderReplay();
 }
 
-// The replay state shows the connection first: a paused page that has lost its stream says so.
+// Replay status is always visible in the hero pill. The connection banner carries detail for
+// non-steady states (and when paused), using only existing replay/detail text.
+const BANNER_STATES = new Set([
+  "connecting", "reconnecting", "unavailable", "reloading", "complete", "paused",
+]);
+
 function renderReplay() {
   const shown = held && replay !== "reconnecting" && replay !== "unavailable" ? "paused" : replay;
   const node = $("replay-state");
   node.className = "replay-state r-" + shown;
   node.textContent = REPLAY_TEXT[shown];
   const banner = $("connection");
-  banner.hidden = !(replay === "reconnecting" || replay === "unavailable");
-  banner.className = "connection c-" + replay;
-  $("connection-text").textContent = replayDetail;
+  const detail = replayDetail || (
+    shown === "connecting" ? "Connecting to the replay." :
+    shown === "replaying" ? "" :
+    shown === "paused" ? (held ? holdText(held) : "Updates are paused.") :
+    shown === "complete" ? "Replay complete." :
+    shown === "reloading" ? "Reloading the replay." :
+    shown === "reconnecting" ? "Connection lost. Reconnecting to the replay." :
+    shown === "unavailable" ? "The replay is unavailable." :
+    ""
+  );
+  const showBanner = BANNER_STATES.has(shown) || Boolean(detail);
+  banner.hidden = !showBanner || (shown === "replaying" && !held && !detail);
+  banner.className = "connection c-" + shown;
+  $("connection-text").textContent = detail || REPLAY_TEXT[shown];
   $("retry").hidden = replay !== "unavailable";
   const button = $("hold");
   button.textContent = held ? "Resume updates" : "Pause updates";
@@ -293,9 +309,9 @@ function makeItem() {
 
   const work = el("details", "disclosure work");
   const workPanel = el("div", "work-panel");
-  const workNote = el("p", "work-note", "The verifier's decision is authoritative. Rows marked " +
-    "\u201cproposed\u201d are what the reasoner suggested before verification; they are not " +
-    "conclusions.");
+  const workNote = el("p", "work-note", "Trace the Evidence shows the server\u2019s work for this " +
+    "revision. The verifier\u2019s decision is authoritative. Rows marked \u201cproposed\u201d are " +
+    "what the reasoner suggested before verification; they are not conclusions.");
   const workStatus = el("p", "work-status");
   const stale = el("p", "work-stale");
   stale.hidden = true;
@@ -305,7 +321,7 @@ function makeItem() {
   stale.append(staleText, latest);
   const workRows = el("div", "work-rows");
   workPanel.append(workNote, workStatus, stale, workRows);
-  work.append(el("summary", null, "Evidence and verification"), workPanel);
+  work.append(el("summary", null, "Trace the Evidence"), workPanel);
 
   const history = el("details", "disclosure history");
   const historySummary = el("summary", null, "Revision history");
@@ -481,7 +497,7 @@ function logEntry(type, cls, text, at, item) {
 
 function contextFor(panel, at) {
   const list = el("ul", "context-list");
-  panel.append(el("p", "context-head", "Analysis showing at " + at), list);
+  panel.append(el("p", "context-head", "Verified Analysis showing at " + at), list);
   const none = el("p", "quiet", "No verified insight was showing at this point.");
   panel.append(none, el("p", "context-note",
     "Shown for context only. MatchEyes does not link this analysis to the event."));
@@ -713,7 +729,7 @@ function drawAxis() {
     out.push(svgText("c-small", 0, G.scoreTop + 28, current.away.short_name));
     out.push(svgLine("c-key c-step-away", 30, G.scoreTop + 24, 54, G.scoreTop + 24));
   }
-  out.push(svgText("c-label", 0, G.notes + 8, "Analysis"));
+  out.push(svgText("c-label", 0, G.notes + 8, "Verified Analysis"));
   $("chart-axis").replaceChildren(...out);
 }
 
@@ -1222,16 +1238,16 @@ function statsRow(row) {
 }
 
 function statsNotice(stats, latest) {
-  const tail = latest && statsLastValid ? " The last statistics were for " + statsLastValid + "." : "";
-  if (!statsReadable(stats)) return "Team statistics for this minute could not be read." + tail;
+  const tail = latest && statsLastValid ? " The last ledger was for " + statsLastValid + "." : "";
+  if (!statsReadable(stats)) return "The Stat Ledger for this minute could not be read." + tail;
   if (stats.status === "invalid") {
-    return "No team statistics for " + stats.minute + ": the match data for this minute did not " +
+    return "No Stat Ledger for " + stats.minute + ": the match data for this minute did not " +
       "pass its consistency checks." + tail;
   }
   if (stats.status === "unavailable") {
-    return "Team statistics for " + stats.minute + " could not be calculated." + tail;
+    return "The Stat Ledger for " + stats.minute + " could not be calculated." + tail;
   }
-  return "Team statistics for " + stats.minute + " could not be read." + tail;
+  return "The Stat Ledger for " + stats.minute + " could not be read." + tail;
 }
 
 // The state of the statistics shown: "none" before any, "valid", "stale", "missing", "invalid",
@@ -1249,8 +1265,8 @@ function statsAnnouncement(before, after, notice) {
   if (after === before || after === "none") return "";
   if (after !== "valid") return notice;
   if (before === "none") return "";
-  return before === "stale" ? "Team statistics are up to date again." :
-    "Team statistics are available again.";
+  return before === "stale" ? "The Stat Ledger is up to date again." :
+    "The Stat Ledger is available again.";
 }
 
 function renderStats() {
@@ -1258,7 +1274,7 @@ function renderStats() {
   const stats = latest ? statsLatest : statsAt.get(picked.snapshot);
   const rows = stats && statsReadable(stats) && stats.status === "valid" ? statsRows(stats) : null;
   const state = statsState(stats, rows, latest, statsBehind);
-  let anchor = "Team statistics appear here from the first snapshot of the replay.";
+  let anchor = "The Stat Ledger appears here from the first snapshot of the replay.";
   let notice = "";
   if (stats && statsReadable(stats)) {
     const half = PERIOD_LABEL[stats.period];
@@ -1270,10 +1286,10 @@ function renderStats() {
     anchor = "The latest snapshot.";
   }
   if (state === "missing") {
-    notice = latest ? "No team statistics have been received for this replay yet." :
-      "No team statistics were received for the selected event's minute.";
+    notice = latest ? "No Stat Ledger data has been received for this replay yet." :
+      "No Stat Ledger data was received for the selected event's minute.";
   } else if (state === "stale") {
-    notice = "These statistics have not been updated since " + stats.minute + ".";
+    notice = "This ledger has not been updated since " + stats.minute + ".";
   } else if (state !== "valid" && state !== "none") {
     notice = statsNotice(stats, latest) + " " + STATS_NOT_CARRIED;
   }
