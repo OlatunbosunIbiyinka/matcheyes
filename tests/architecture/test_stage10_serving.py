@@ -282,7 +282,13 @@ def test_stage10_chrome_uses_glossary_labels_and_rejects_retired_names() -> None
     assert HTML.index('id="chart"') < HTML.index('id="stats"') < HTML.index("<main")
     assert "BANNER_STATES" in JS
     for state in (
-        "connecting", "replaying", "reconnecting", "complete", "unavailable", "paused", "reloading",
+        "connecting",
+        "replaying",
+        "reconnecting",
+        "complete",
+        "unavailable",
+        "paused",
+        "reloading",
     ):
         assert f"{state}:" in JS or f'"{state}"' in JS
     assert 'summary", null, "Trace the Evidence"' in JS or 'Trace the Evidence"' in JS
